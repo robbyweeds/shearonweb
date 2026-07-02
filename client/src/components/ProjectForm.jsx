@@ -93,34 +93,124 @@ export default function ProjectForm() {
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "500px", margin: "auto" }}>
-      <h2>Existing Projects</h2>
-      {projects.length === 0 && <p>No projects found</p>}
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {projects.map((p) => (
-          <li key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", padding: "0.5rem", border: "1px solid #ddd", borderRadius: "4px" }}>
-            <span><strong>{p.project_name}</strong> ({p.date}) - {p.acres} acres</span>
-            <div>
-              <button style={{ marginRight: "0.5rem" }} onClick={() => handleLoad(p.id)}>Load</button>
-              <button style={{ backgroundColor: "#dc3545", color: "white" }} onClick={() => handleDelete(p.id)}>Delete</button>
-            </div>
-          </li>
-        ))}
-      </ul>
+  <div style={{ display: "flex", gap: "2rem", padding: "2rem" }}>
+    {/* Existing Projects Sidebar */}
+    <div
+      style={{
+        width: "300px",
+        maxHeight: "500px",
+        overflowY: "auto",
+        border: "1px solid #ddd",
+        borderRadius: "8px",
+        padding: "1rem",
+        background: "#f9f9f9",
+      }}
+    >
+      <h3 style={{ marginTop: 0 }}>Existing Projects</h3>
 
-      <h2 style={{ marginTop: "2rem" }}>Create / Edit Project</h2>
+      {projects.length === 0 && <p>No projects found</p>}
+
+      {projects.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            borderBottom: "1px solid #ddd",
+            padding: "8px 0",
+          }}
+        >
+          {/* Project Name */}
+          <div
+            style={{
+              fontWeight: "600",
+              fontSize: "15px",
+              marginBottom: "4px",
+            }}
+          >
+            {p.project_name}
+          </div>
+
+          {/* Details */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              fontSize: "12px",
+              color: "#666",
+            }}
+          >
+            <span>{p.date}</span>
+            <span>{p.acres} ac</span>
+
+            <button
+              style={{
+                padding: "2px 8px",
+                fontSize: "11px",
+                height: "24px",
+                cursor: "pointer",
+              }}
+              onClick={() => handleLoad(p.id)}
+            >
+              Load
+            </button>
+
+            <button
+              style={{
+                padding: "2px 8px",
+                fontSize: "11px",
+                height: "24px",
+                background: "#dc3545",
+                color: "white",
+                border: "none",
+                borderRadius: "3px",
+                cursor: "pointer",
+              }}
+              onClick={() => handleDelete(p.id)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Main Form */}
+    <div style={{ flex: 1, maxWidth: "500px", margin: "0 auto" }}>
+      <h2>Create / Edit Project</h2>
+
       <form onSubmit={handleContinue}>
         <label>Project Name</label>
-        <input type="text" name="projectName" value={formData.projectName} onChange={handleChange} required />
+        <input
+          type="text"
+          name="projectName"
+          value={formData.projectName}
+          onChange={handleChange}
+          required
+        />
 
         <label>Date</label>
-        <input type="date" name="date" value={formData.date} onChange={handleChange} required />
+        <input
+          type="date"
+          name="date"
+          value={formData.date}
+          onChange={handleChange}
+          required
+        />
 
         <label>Acres</label>
-        <input type="number" name="acres" value={formData.acres} onChange={handleChange} step="0.01" min="0" required />
+        <input
+          type="number"
+          name="acres"
+          value={formData.acres}
+          onChange={handleChange}
+          step="0.01"
+          min="0"
+          required
+        />
 
         <button type="submit">Continue</button>
       </form>
     </div>
-  );
+  </div>
+);
 }
