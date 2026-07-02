@@ -1,5 +1,5 @@
 // =====================================
-// MowingTable.jsx — FINAL FIXED VERSION (OCC CELL YELLOW ONLY)
+// MowingTable.jsx — Excel-style layout
 // =====================================
 
 import React, { useMemo } from "react";
@@ -10,6 +10,7 @@ import {
   INITIAL_MOWING_DATA,
   DECK_KEYS,
   SMPWR_KEYS,
+  SPECIALTY_KEY,
 } from "./mowingDefaults";
 
 import { computeHours, computeTotals } from "./mowingCalculations";
@@ -30,36 +31,28 @@ export default function MowingTable({ tableId }) {
   const tableEntry =
     mowingList.find((t) => t.id === tableId) || { id: tableId, data: {} };
 
-  // --------------------------------------
-  // MERGE DEFAULT DATA + SAVED DATA
-  // --------------------------------------
   const data = useMemo(() => {
     const d = tableEntry.data || {};
 
     return {
       ...INITIAL_MOWING_DATA,
       ...d,
-
       selectedEfficiency: {
         ...INITIAL_MOWING_DATA.selectedEfficiency,
         ...(d.selectedEfficiency || {}),
       },
-
       acres: {
         ...INITIAL_MOWING_DATA.acres,
         ...(d.acres || {}),
       },
-
       qtyUnit: {
         ...INITIAL_MOWING_DATA.qtyUnit,
         ...(d.qtyUnit || {}),
       },
-
       manualOverrides: {
         ...INITIAL_MOWING_DATA.manualOverrides,
         ...(d.manualOverrides || {}),
       },
-
       summary: {
         ...INITIAL_MOWING_DATA.summary,
         ...(d.summary || {}),
@@ -67,9 +60,6 @@ export default function MowingTable({ tableId }) {
     };
   }, [tableEntry.data]);
 
-  // --------------------------------------
-  // COMPUTE HOURS + TOTALS
-  // --------------------------------------
   const qtyUnitComputed = computeHours(
     data,
     acresPerHour,
@@ -79,21 +69,36 @@ export default function MowingTable({ tableId }) {
 
   const totals = computeTotals(data, qtyUnitComputed, mowingDollars);
 
-  // --------------------------------------
-  // SAVE FUNCTION
-  // --------------------------------------
+  const adjustedOcc =
+    totals.adjustedOcc ??
+    (totals.totalOcc || 0) * (1 + (data.summary.adjPercent || 0) / 100);
+
+  const totalHoursAllOcc =
+    totals.totalHoursAllOcc ??
+    (totals.totalHours || 0) * (data.summary.numOccurrences || 0);
+
+  const pricePerAcre =
+    totals.pricePerAcre ??
+    (totals.totalAcres > 0 ? (totals.final || 0) / totals.totalAcres : 0);
+
   const save = (updated) => {
     saveMowing(tableId, updated, mowingList, updateService, totals);
   };
 
-  // --------------------------------------
-  // HANDLERS
-  // --------------------------------------
-  const handleNameChange = (e) =>
-    save({ ...data, name: e.target.value });
+  const handleNameChange = (e) => save({ ...data, name: e.target.value });
+
+  const handleFieldChange = (field) => (e) => {
+    const value =
+      e.target.type === "number"
+        ? parseFloat(e.target.value) || 0
+        : e.target.value;
+
+    save({ ...data, [field]: value });
+  };
 
   const handleAcresChange = (key) => (e) => {
     const val = parseFloat(e.target.value) || 0;
+
     save({
       ...data,
       acres: { ...data.acres, [key]: val },
@@ -121,7 +126,7 @@ export default function MowingTable({ tableId }) {
   };
 
   const handleManualOverride = (key) => (e) => {
-    let raw = e.target.value;
+    const raw = e.target.value;
 
     if (raw === "") {
       save({
@@ -131,10 +136,8 @@ export default function MowingTable({ tableId }) {
       return;
     }
 
-    let num = parseFloat(raw);
-    if (isNaN(num)) num = 0;
-
-    const snapped = Math.round(num * 4) / 4;
+    const num = parseFloat(raw);
+    const snapped = Math.round((isNaN(num) ? 0 : num) * 4) / 4;
     const final = Number(snapped.toFixed(2));
 
     save({
@@ -144,10 +147,8 @@ export default function MowingTable({ tableId }) {
   };
 
   const handleQtyChange = (key) => (e) => {
-    let num = parseFloat(e.target.value);
-    if (isNaN(num)) num = 0;
-
-    const snapped = Math.round(num * 4) / 4;
+    const num = parseFloat(e.target.value);
+    const snapped = Math.round((isNaN(num) ? 0 : num) * 4) / 4;
     const final = Number(snapped.toFixed(2));
 
     save({
@@ -156,115 +157,169 @@ export default function MowingTable({ tableId }) {
     });
   };
 
-  // --------------------------------------
-  // RENDER
-  // --------------------------------------
+  const cellStyle = {
+    padding: "4px",
+    fontSize: "12px",
+    textAlign: "center",
+    whiteSpace: "nowrap",
+  };
+
+  const inputCellStyle = {
+    ...cellStyle,
+    background: "#b3d9ff",
+  };
+
+  const summaryLabelStyle = {
+    ...cellStyle,
+    fontWeight: "bold",
+    textAlign: "right",
+    background: "#f3f3f3",
+  };
+
+  const summaryValueStyle = {
+    ...cellStyle,
+    background: "#eef",
+    fontWeight: "bold",
+  };
+
   return (
-    <div style={{ marginBottom: "2rem", border: "1px solid #ccc", padding: "1rem" }}>
-      {/* NAME ROW */}
-      <div style={{ marginBottom: "1rem", display: "flex", alignItems: "center" }}>
-        <h3 style={{ marginRight: "1rem" }}>Mowing Area Name:</h3>
-        <input
-          type="text"
-          value={data.name}
-          onChange={handleNameChange}
-          style={{ padding: "8px", fontSize: "16px", width: "33%" }}
+    <div
+      style={{
+        marginBottom: "2rem",
+        border: "1px solid #ccc",
+        padding: "1rem",
+        overflowX: "auto",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 100px 100px",
+          gap: "15px",
+          alignItems: "end",
+          marginBottom: "12px",
+        }}
+      >
+        <div>
+          <label style={{ fontWeight: "bold" }}>Mowing Area</label>
+          <input
+            type="text"
+            value={data.name}
+            onChange={handleNameChange}
+            style={{ width: "100%", padding: "6px" }}
+          />
+        </div>
+
+        <div>
+          <label style={{ fontWeight: "bold" }}>Crew Size</label>
+          <input
+            type="number"
+            value={data.crewSize}
+            onChange={handleFieldChange("crewSize")}
+            style={{ width: "100%", padding: "6px" }}
+          />
+        </div>
+
+        <div>
+          <label style={{ fontWeight: "bold" }}>Days</label>
+          <input
+            type="number"
+            value={data.days}
+            onChange={handleFieldChange("days")}
+            style={{ width: "100%", padding: "6px" }}
+          />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "12px" }}>
+        <label style={{ fontWeight: "bold" }}>Notes</label>
+        <textarea
+          rows={2}
+          value={data.notes}
+          onChange={handleFieldChange("notes")}
+          style={{ width: "100%", padding: "8px", resize: "vertical" }}
         />
       </div>
 
-      {/* ===================================================== */}
-      {/* ===================== TABLE ========================= */}
-      {/* ===================================================== */}
-
-      <table border="1" style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
+      <table
+        border="1"
+        style={{
+          minWidth: "1350px",
+          width: "100%",
+          borderCollapse: "collapse",
+          textAlign: "center",
+        }}
+      >
         <thead>
           <tr>
-            <th rowSpan={2}>ITEM</th>
-            <th rowSpan={2}>MISC</th>
-
-            <th colSpan={2}>72"</th>
-            <th colSpan={2}>60"</th>
-            <th colSpan={2}>48"</th>
-
-            <th colSpan={3}>LABOR</th>
-
-            <th rowSpan={2}>5111</th>
-            <th rowSpan={2}># OCC</th>
-
-            {/* OCC CELL → YELLOW ONLY */}
-            <th rowSpan={2} style={{ backgroundColor: "yellow" }}>
-              <LabeledInput
-                value={data.summary.numOccurrences}
-                onChange={handleSummaryChange("numOccurrences")}
-                type="number"
-                min={0}
-                step={1}
-              />
-            </th>
-          </tr>
-
-          <tr>
-            <th>area1</th><th>area2</th>
-            <th>area1</th><th>area2</th>
-            <th>area1</th><th>area2</th>
-            <th>TRIMMER</th>
-            <th>BLOWER</th>
-            <th>ROTARY</th>
+            <th style={cellStyle}>ITEM</th>
+            <th style={cellStyle}>MISC</th>
+            <th style={cellStyle}>72&quot;-area1</th>
+            <th style={cellStyle}>72&quot;-area2</th>
+            <th style={cellStyle}>60&quot;-area1</th>
+            <th style={cellStyle}>60&quot;-area2</th>
+            <th style={cellStyle}>48&quot;-area1</th>
+            <th style={cellStyle}>48&quot;-area2</th>
+            <th style={cellStyle}>TRIMMER</th>
+            <th style={cellStyle}>BLOWER</th>
+            <th style={cellStyle}>ROTARY</th>
+            <th style={cellStyle}>Specialty</th>
+            <th style={summaryLabelStyle}>HRS/OCC:</th>
+            <th style={summaryValueStyle}>{totals.totalHours.toFixed(2)}</th>
           </tr>
         </thead>
 
         <tbody>
-          {/* EFFICIENCY ROW */}
           <tr style={{ background: "#e9f7ef", fontWeight: "bold" }}>
-            <td>EFFICIENCY</td>
-            <td style={{ background: "#ccc" }}></td>
+            <td style={cellStyle}>EFFICIENCY</td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
 
             {DECK_KEYS.map((key) => (
-              <td key={key}>
+              <td key={key} style={cellStyle}>
                 <select
                   value={data.selectedEfficiency[key]}
                   onChange={handleEfficiencyChange(key)}
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", fontSize: "11px" }}
                 >
-                  {Object.keys(acresPerHour[key.split("-")[0]]).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt.replace("_", " ")}
-                    </option>
-                  ))}
+                  {Object.keys(acresPerHour[key.split("-")[0]] || {}).map(
+                    (opt) => (
+                      <option key={opt} value={opt}>
+                        {opt.replaceAll("_", " ")}
+                      </option>
+                    )
+                  )}
                 </select>
               </td>
             ))}
 
             {SMPWR_KEYS.map((key) => (
-              <td key={key}>
+              <td key={key} style={cellStyle}>
                 <select
                   value={data.selectedEfficiency[key]}
                   onChange={handleEfficiencyChange(key)}
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", fontSize: "11px" }}
                 >
-                  {Object.keys(smPwrEfficiency[key]).map((opt) => (
+                  {Object.keys(smPwrEfficiency[key] || {}).map((opt) => (
                     <option key={opt} value={opt}>
-                      {opt.replace("_", " ")}
+                      {opt.replaceAll("_", " ")}
                     </option>
                   ))}
                 </select>
               </td>
             ))}
 
-            <td style={{ background: "#ccc" }}></td>
-            <td style={{ background: "#ccc" }}></td>
-
-            <td>HRS/OCC</td>
-            <td style={{ background: "#eef" }}>{totals.totalHours.toFixed(2)}</td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
+            <td style={summaryLabelStyle}>ACRES:</td>
+            <td style={summaryValueStyle}>{totals.totalAcres.toFixed(2)}</td>
           </tr>
 
-          {/* ACRES ROW */}
           <tr>
-            <td>ACRES</td>
-            <td style={{ background: "#ccc" }}></td>
+            <td style={cellStyle}>ACRES</td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
 
             {DECK_KEYS.map((key) => (
-              <td key={key}>
+              <td key={key} style={cellStyle}>
                 <LabeledInput
                   value={data.acres[key]}
                   type="number"
@@ -275,20 +330,18 @@ export default function MowingTable({ tableId }) {
               </td>
             ))}
 
-            <td style={{ background: "#ccc" }}></td>
-            <td style={{ background: "#ccc" }}></td>
-            <td style={{ background: "#ccc" }}></td>
-            <td style={{ background: "#ccc" }}></td>
-
-            <td>ACRES:</td>
-            <td style={{ background: "#eef" }}>{totals.totalAcres.toFixed(2)}</td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
+            <td style={{ ...cellStyle, background: "#ccc" }}></td>
+            <td style={summaryLabelStyle}>$/Occ:</td>
+            <td style={summaryValueStyle}>${totals.totalOcc.toFixed(2)}</td>
           </tr>
 
-          {/* QTY / UNIT */}
           <tr>
-            <td>QTY/UNIT</td>
+            <td style={cellStyle}>QTY/UNIT</td>
 
-            <td style={{ background: "#b3d9ff" }}>
+            <td style={inputCellStyle}>
               <LabeledInput
                 value={data.qtyUnit.MISC_HRS.toFixed(2)}
                 type="number"
@@ -298,9 +351,9 @@ export default function MowingTable({ tableId }) {
             </td>
 
             {DECK_KEYS.map((key) => (
-              <td key={key} style={{ background: "#b3d9ff" }}>
+              <td key={key} style={inputCellStyle}>
                 <LabeledInput
-                  value={(data.manualOverrides[key] ?? qtyUnitComputed[key]).toFixed(2)}
+                  value={(data.manualOverrides[key] ?? qtyUnitComputed[key] ?? 0).toFixed(2)}
                   type="number"
                   step={0.25}
                   onChange={handleManualOverride(key)}
@@ -308,25 +361,25 @@ export default function MowingTable({ tableId }) {
               </td>
             ))}
 
-            <td style={{ background: "#b3d9ff" }}>
+            <td style={inputCellStyle}>
               <LabeledInput
-                value={(data.manualOverrides.TRIMMER ?? qtyUnitComputed.TRIMMER).toFixed(2)}
+                value={(data.manualOverrides.TRIMMER ?? qtyUnitComputed.TRIMMER ?? 0).toFixed(2)}
                 type="number"
                 step={0.25}
                 onChange={handleManualOverride("TRIMMER")}
               />
             </td>
 
-            <td style={{ background: "#b3d9ff" }}>
+            <td style={inputCellStyle}>
               <LabeledInput
-                value={(data.manualOverrides.BLOWER ?? qtyUnitComputed.BLOWER).toFixed(2)}
+                value={(data.manualOverrides.BLOWER ?? qtyUnitComputed.BLOWER ?? 0).toFixed(2)}
                 type="number"
                 step={0.25}
                 onChange={handleManualOverride("BLOWER")}
               />
             </td>
 
-            <td style={{ background: "#b3d9ff" }}>
+            <td style={inputCellStyle}>
               <LabeledInput
                 value={data.qtyUnit.ROTARY.toFixed(2)}
                 type="number"
@@ -335,35 +388,17 @@ export default function MowingTable({ tableId }) {
               />
             </td>
 
-            <td style={{ background: "#b3d9ff" }}>
+            <td style={inputCellStyle}>
               <LabeledInput
-                value={data.qtyUnit["5111"].toFixed(2)}
+                value={data.qtyUnit[SPECIALTY_KEY].toFixed(2)}
                 type="number"
                 step={0.25}
-                onChange={handleQtyChange("5111")}
+                onChange={handleQtyChange(SPECIALTY_KEY)}
               />
             </td>
 
-            <td>$/OCC</td>
-            <td style={{ background: "#eef" }}>{totals.totalOcc.toFixed(2)}</td>
-          </tr>
-
-          {/* UNIT DOLLARS */}
-          <tr>
-            <td>UNIT $</td>
-
-            <td>${mowingDollars.MISC_HRS.toFixed(2)}</td>
-
-            {DECK_KEYS.map((key) => (
-              <td key={key}>${(mowingDollars[key] || 0).toFixed(2)}</td>
-            ))}
-
-            <td>${(mowingDollars.TRIMMER || 0).toFixed(2)}</td>
-            <td>${(mowingDollars.BLOWER || 0).toFixed(2)}</td>
-            <td>${(mowingDollars.ROTARY || 0).toFixed(2)}</td>
-            <td>${(mowingDollars["5111"] || 0).toFixed(2)}</td>
-
-            <td>
+            <td style={summaryLabelStyle}>ADJ%:</td>
+            <td style={summaryValueStyle}>
               <LabeledInput
                 value={data.summary.adjPercent}
                 type="number"
@@ -372,29 +407,73 @@ export default function MowingTable({ tableId }) {
                 onChange={handleSummaryChange("adjPercent")}
               />
             </td>
-
-            <td style={{ background: "#eef" }}>${totals.adjDollar.toFixed(2)}</td>
           </tr>
 
-          {/* TOTAL ROW (NO YELLOW NOW) */}
-          <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
-            <td>TOTAL</td>
-
-            <td>${totals.rowTotals.MISC_HRS.toFixed(2)}</td>
+          <tr>
+            <td style={cellStyle}>UNIT $</td>
+            <td style={cellStyle}>${(mowingDollars.MISC_HRS || 0).toFixed(2)}</td>
 
             {DECK_KEYS.map((key) => (
-              <td key={key}>${totals.rowTotals[key].toFixed(2)}</td>
+              <td key={key} style={cellStyle}>
+                ${(mowingDollars[key] || 0).toFixed(2)}
+              </td>
             ))}
 
-            <td>${totals.rowTotals.TRIMMER.toFixed(2)}</td>
-            <td>${totals.rowTotals.BLOWER.toFixed(2)}</td>
-            <td>${totals.rowTotals.ROTARY.toFixed(2)}</td>
-            <td>${totals.rowTotals["5111"].toFixed(2)}</td>
+            <td style={cellStyle}>${(mowingDollars.TRIMMER || 0).toFixed(2)}</td>
+            <td style={cellStyle}>${(mowingDollars.BLOWER || 0).toFixed(2)}</td>
+            <td style={cellStyle}>${(mowingDollars.ROTARY || 0).toFixed(2)}</td>
+            <td style={cellStyle}>${(mowingDollars[SPECIALTY_KEY] || 0).toFixed(2)}</td>
 
-            <td>TOTAL $</td>
+            <td style={summaryLabelStyle}>ADJ $/Occ:</td>
+            <td style={summaryValueStyle}>${adjustedOcc.toFixed(2)}</td>
+          </tr>
 
-            {/* 🟢 NO MORE YELLOW */}
-            <td>${totals.final.toFixed(2)}</td>
+          <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
+            <td style={cellStyle}>TOTAL</td>
+
+            <td style={cellStyle}>${(totals.rowTotals.MISC_HRS || 0).toFixed(2)}</td>
+
+            {DECK_KEYS.map((key) => (
+              <td key={key} style={cellStyle}>
+                ${(totals.rowTotals[key] || 0).toFixed(2)}
+              </td>
+            ))}
+
+            <td style={cellStyle}>${(totals.rowTotals.TRIMMER || 0).toFixed(2)}</td>
+            <td style={cellStyle}>${(totals.rowTotals.BLOWER || 0).toFixed(2)}</td>
+            <td style={cellStyle}>${(totals.rowTotals.ROTARY || 0).toFixed(2)}</td>
+            <td style={cellStyle}>${(totals.rowTotals[SPECIALTY_KEY] || 0).toFixed(2)}</td>
+
+            <td style={summaryLabelStyle}># OCC:</td>
+            <td style={{ ...summaryValueStyle, background: "yellow" }}>
+              <LabeledInput
+                value={data.summary.numOccurrences}
+                onChange={handleSummaryChange("numOccurrences")}
+                type="number"
+                min={0}
+                step={1}
+              />
+            </td>
+          </tr>
+
+          <tr>
+            <td colSpan={12} style={{ border: "none" }}></td>
+            <td style={summaryLabelStyle}>TOTAL $:</td>
+            <td style={summaryValueStyle}>${totals.final.toFixed(2)}</td>
+          </tr>
+
+          <tr>
+            <td colSpan={12} style={{ border: "none" }}></td>
+            <td style={summaryLabelStyle}>TOT HRS:</td>
+            <td style={summaryValueStyle}>{totalHoursAllOcc.toFixed(2)}</td>
+          </tr>
+
+          <tr>
+            <td colSpan={12} style={{ border: "none" }}></td>
+            <td style={summaryLabelStyle}>Price / A:</td>
+            <td style={summaryValueStyle}>
+              {totals.totalAcres > 0 ? `$${pricePerAcre.toFixed(2)}` : "#DIV/0!"}
+            </td>
           </tr>
         </tbody>
       </table>
