@@ -8,7 +8,7 @@ export default function ProjectList() {
   const { updateService } = useServiceContext();
 
   useEffect(() => {
-    fetch("http://localhost:5000/projects")
+    fetch("/api/projects")
       .then(res => res.json())
       .then(data => {
         if (data.success) setProjects(data.projects);
@@ -19,7 +19,7 @@ export default function ProjectList() {
   const handleDelete = (projectId) => {
   if (!window.confirm("Are you sure you want to delete this project?")) return;
 
-  fetch(`http://localhost:5000/project/${projectId}`, { method: "DELETE" })
+  fetch(`/api/project/${projectId}`, { method: "DELETE" })
     .then(res => res.json())
     .then(data => {
       if (data.success) {
@@ -34,7 +34,7 @@ export default function ProjectList() {
 
 
   const handleLoad = (projectId) => {
-    fetch(`http://localhost:5000/project/${projectId}`)
+    fetch(`/api/project/${projectId}`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {

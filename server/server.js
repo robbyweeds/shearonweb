@@ -44,7 +44,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER,
-    type TEXT,
+    service_type TEXT,
     data TEXT,
     FOREIGN KEY(project_id) REFERENCES projects(id)
   );
@@ -127,7 +127,7 @@ app.get("/project/:id", (req, res) => {
     }
 
     const services = db
-      .prepare("SELECT type, data FROM services WHERE project_id = ?")
+      .prepare("SELECT service_type, data FROM services WHERE project_id = ?")
       .all(projectId);
 
     const parsedServices = {};
@@ -176,7 +176,7 @@ app.post("/project", (req, res) => {
 
     // Insert services
     const insertService = db.prepare(`
-      INSERT INTO services (project_id, type, data)
+      INSERT INTO services (project_id, service_type, data)
       VALUES (?, ?, ?)
     `);
 
