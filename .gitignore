@@ -1,0 +1,12 @@
+# Node dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# React build output
+client/build/
+
+# Logs
+npm-debug.log*
