@@ -1,4 +1,3 @@
-// myapp/client/src/components/ServicesPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../context/ServiceContext";
@@ -6,16 +5,15 @@ import { useServiceContext } from "../context/ServiceContext";
 import { INITIAL_MOWING_DATA } from "./Mowing/mowingDefaults";
 import { computeHours, computeTotals } from "./Mowing/mowingCalculations";
 
+const API_URL = process.env.REACT_APP_API_URL || "";
+const money = (value) => `$${Number(value || 0).toFixed(2)}`;
+const SAVED_RATES_KEY = "__rates";
+
 export default function ServicesPage() {
   const navigate = useNavigate();
   const { currentServices, updateService, getAllServices, currentRates } =
     useServiceContext();
 
-  const API_URL = process.env.REACT_APP_API_URL;
-
-  // ---------------------------------------
-  // PROJECT INFO
-  // ---------------------------------------
   const [project, setProject] = useState({
     projectName: "",
     date: "",
@@ -27,9 +25,6 @@ export default function ServicesPage() {
     if (stored) setProject(stored);
   }, []);
 
-  // ---------------------------------------
-  // DELETE HANDLERS
-  // ---------------------------------------
   const deleteMowing = (id) =>
     updateService(
       "mowing",
@@ -50,10 +45,8 @@ export default function ServicesPage() {
 
   const deleteEdging = () => updateService("edging", null);
   const deleteBedMaintenance = () => updateService("bedMaintenance", null);
+  const deleteLeaves = () => updateService("leaves", null);
 
-  // ---------------------------------------
-  // COMPUTE MOWING PREVIEW
-  // ---------------------------------------
   const acresPerHour = currentRates?.mowingFactors?.acresPerHour || {};
   const mowingDollars = currentRates?.mowingDollars || {};
 
@@ -84,9 +77,6 @@ export default function ServicesPage() {
     return { merged, totals };
   };
 
-  // ---------------------------------------
-  // EDGING PREVIEW
-  // ---------------------------------------
   const computeEdgingTotals = (entry) => {
     if (!entry || !entry.data) return null;
 
@@ -94,20 +84,11 @@ export default function ServicesPage() {
     const qty = d.qtyUnit || { EDGER: 0, BLOWER: 0 };
     const price = d.unitPrice || { EDGER: 0, BLOWER: 0 };
     const occ = d.summary?.numOccurrences || 0;
+    const pricePerOcc = qty.EDGER * price.EDGER + qty.BLOWER * price.BLOWER;
 
-    const totalOccDollar =
-      qty.EDGER * price.EDGER + qty.BLOWER * price.BLOWER;
-
-    return {
-      occ,
-      pricePerOcc: totalOccDollar,
-      finalTotal: totalOccDollar * occ,
-    };
+    return { occ, pricePerOcc, finalTotal: pricePerOcc * occ };
   };
 
-  // ---------------------------------------
-  // BED MAINT PREVIEW (SAFE)
-  // ---------------------------------------
   const computeBedTotals = (entry) => {
     if (!entry || !entry.data) return null;
 
@@ -115,22 +96,14 @@ export default function ServicesPage() {
     const qty = d.qtyUnit || { HAND: 0, BACKPACK: 0, ROUNDUP: 0 };
     const price = d.unitPrice || { HAND: 0, BACKPACK: 0, ROUNDUP: 0 };
     const occ = d.summary?.numOccurrences || 0;
-
-    const occDollar =
+    const pricePerOcc =
       qty.HAND * price.HAND +
       qty.BACKPACK * price.BACKPACK +
       qty.ROUNDUP * price.ROUNDUP;
 
-    return {
-      occ,
-      pricePerOcc: occDollar,
-      finalTotal: occDollar * occ,
-    };
+    return { occ, pricePerOcc, finalTotal: pricePerOcc * occ };
   };
 
-  // ---------------------------------------
-  // PRUNING PREVIEW (SAFE + FIXED OCC)
-  // ---------------------------------------
   const computePruningTotals = (entry) => {
     if (!entry || !entry.data) return null;
 
@@ -151,37 +124,122 @@ export default function ServicesPage() {
       CHAINSAW: 0,
     };
 
-    // FIX → correct field for occurrences
-    const occ =
-      Number(d.occurrences) ||
-      Number(d.summary?.numOccurrences) ||
-      0;
-
-    const hoursPerOcc =
-      qty.MISC +
-      qty.HAND +
-      qty.SHEARS +
-      qty.CLEANUP +
-      qty.CHAINSAW;
-
-    const dollarPerOcc =
+    const occ = Number(d.occurrences) || Number(d.summary?.numOccurrences) || 0;
+    const pricePerOcc =
       qty.MISC * price.MISC +
       qty.HAND * price.HAND +
       qty.SHEARS * price.SHEARS +
       qty.CLEANUP * price.CLEANUP +
       qty.CHAINSAW * price.CHAINSAW;
 
-    return {
-      occ,
-      hoursPerOcc,
-      pricePerOcc: dollarPerOcc,
-      totalDollar: dollarPerOcc * occ,
-    };
+    return { occ, pricePerOcc, totalDollar: pricePerOcc * occ };
   };
 
-  // ---------------------------------------
-  // SAVE PROJECT
-  // ---------------------------------------
+  const summaryRows = (() => {
+    const rows = [];
+    const mowingEntries = Array.isArray(currentServices.mowing)
+      ? currentServices.mowing
+      : [];
+    const mulchingEntries = Array.isArray(currentServices.mulching)
+      ? currentServices.mulching
+      : [];
+    const pruningEntries = Array.isArray(currentServices.pruning)
+      ? currentServices.pruning
+      : [];
+
+    mowingEntries.forEach((entry) => {
+      const { merged, totals } = computeMowingPreview(entry);
+      rows.push({
+        id: `mowing-${entry.id}`,
+        label: merged.name || "Mowing Area",
+        occ: merged.summary?.numOccurrences || 0,
+        pricePerOcc: totals.adjustedOcc,
+        total: totals.final,
+        onDelete: () => deleteMowing(entry.id),
+      });
+    });
+
+    mulchingEntries.forEach((entry) => {
+      const data = entry.data || {};
+      rows.push({
+        id: `mulching-${entry.id}`,
+        label: data.name || "Mulching Area",
+        occ: data.summary?.numOccurrences || 0,
+        pricePerOcc: 0,
+        total: 0,
+        onDelete: () => deleteMulching(entry.id),
+      });
+    });
+
+    pruningEntries.forEach((entry) => {
+      const calc = computePruningTotals(entry);
+      if (!calc) return;
+
+      rows.push({
+        id: `pruning-${entry.id}`,
+        label: entry.data?.name || "Pruning Area",
+        occ: calc.occ,
+        pricePerOcc: calc.pricePerOcc,
+        total: calc.totalDollar,
+        onDelete: () => deletePruning(entry.id),
+      });
+    });
+
+    if (currentServices.edging) {
+      const entry = Array.isArray(currentServices.edging)
+        ? currentServices.edging[0]
+        : currentServices.edging;
+      const calc = computeEdgingTotals(entry);
+
+      if (calc) {
+        rows.push({
+          id: "edging",
+          label: "Edging",
+          occ: calc.occ,
+          pricePerOcc: calc.pricePerOcc,
+          total: calc.finalTotal,
+          onDelete: deleteEdging,
+        });
+      }
+    }
+
+    if (currentServices.bedMaintenance) {
+      const entry = Array.isArray(currentServices.bedMaintenance)
+        ? currentServices.bedMaintenance[0]
+        : currentServices.bedMaintenance;
+      const calc = computeBedTotals(entry);
+
+      if (calc) {
+        rows.push({
+          id: "bedMaintenance",
+          label: "Bed Maintenance",
+          occ: calc.occ,
+          pricePerOcc: calc.pricePerOcc,
+          total: calc.finalTotal,
+          onDelete: deleteBedMaintenance,
+        });
+      }
+    }
+
+    if (currentServices.leaves) {
+      rows.push({
+        id: "leaves",
+        label: currentServices.leaves.area || "Leaves",
+        occ: currentServices.leaves.quantity || "Saved",
+        pricePerOcc: null,
+        total: null,
+        onDelete: deleteLeaves,
+      });
+    }
+
+    return rows;
+  })();
+
+  const projectTotal = summaryRows.reduce(
+    (total, row) => total + (typeof row.total === "number" ? row.total : 0),
+    0
+  );
+
   const handleSaveProject = async () => {
     const services = getAllServices() || {};
     const sanitized = {};
@@ -190,209 +248,126 @@ export default function ServicesPage() {
       sanitized[k] = v || {};
     });
 
+    sanitized[SAVED_RATES_KEY] = currentRates || {};
+
     if (!project.projectName || !project.date || !project.acres) {
       alert("Project info is missing");
       return;
     }
 
+    const isExistingProject = Boolean(project.id);
+    const url = isExistingProject
+      ? `${API_URL}/project/${project.id}`
+      : `${API_URL}/project`;
+
     try {
-      const response = await fetch(`${API_URL}/project`, {
-        method: "POST",
+      const response = await fetch(url, {
+        method: isExistingProject ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project, services: sanitized }),
       });
 
       const json = await response.json();
       if (json.success) {
-        alert("Project Saved!");
+        const savedProject = { ...project, id: json.projectId || project.id };
+        setProject(savedProject);
+        localStorage.setItem("project", JSON.stringify(savedProject));
+        alert(isExistingProject ? "Project updated" : "Project saved");
         navigate("/");
       } else {
         alert(json.error);
       }
     } catch (err) {
       console.log(err);
-      alert("Network Error");
+      alert("Network error");
     }
   };
 
-  // ---------------------------------------
-  // SHOW TABLE?
-  // ---------------------------------------
-  const hasAnyService =
-    (currentServices.mowing?.length || 0) > 0 ||
-    (currentServices.mulching?.length || 0) > 0 ||
-    (currentServices.pruning?.length || 0) > 0 ||
-    currentServices.edging ||
-    currentServices.bedMaintenance;
-
-  // ---------------------------------------
-  // RENDER
-  // ---------------------------------------
   return (
-    <div style={{ padding: "2rem", maxWidth: "900px", margin: "auto" }}>
-      <h2>Services for {project.projectName || "New Project"}</h2>
-
-      {/* SERVICE ADD BUTTONS */}
-      <section>
-        <h3>Add Services</h3>
-        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <button onClick={() => navigate("/services/mowing")}>Add Mowing</button>
-          <button onClick={() => navigate("/services/mulching")}>Add Mulching</button>
-          <button onClick={() => navigate("/services/pruning")}>Add Pruning</button>
-          <button onClick={() => navigate("/services/leaves")}>Add Leaves</button>
-        </div>
-      </section>
-
-      <button onClick={handleSaveProject} style={{ margin: "1rem 0" }}>
-        Save Project
-      </button>
-
-      {/* PROJECT SUMMARY */}
-      <div style={{ borderTop: "1px solid #ccc", paddingTop: "1rem" }}>
-        <h3>Project Summary</h3>
-        <p><strong>Project:</strong> {project.projectName}</p>
-        <p><strong>Date:</strong> {project.date}</p>
-        <p><strong>Acres:</strong> {project.acres}</p>
-
-        {/* SERVICES SUMMARY */}
-        {hasAnyService && (
-          <div>
-            <h3>Service Summary</h3>
-
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={th}>Service</th>
-                  <th style={th}>Occurrences</th>
-                  <th style={th}>Price / Occ</th>
-                  <th style={th}>Total</th>
-                  <th style={th}></th>
-                </tr>
-              </thead>
-
-              <tbody>
-
-                {/* ---------------- MOWING ---------------- */}
-                {currentServices.mowing?.map((t) => {
-                  const { merged, totals } = computeMowingPreview(t);
-                  const occ = merged.summary?.numOccurrences || 0;
-
-                  return (
-                    <tr key={t.id}>
-                      <td style={td}>{merged.name || "Mowing Area"}</td>
-                      <td style={tdCenter}>{occ}</td>
-                      <td style={tdCenter}>${totals.adjDollar.toFixed(2)}</td>
-                      <td style={tdCenter}>${totals.final.toFixed(2)}</td>
-                      <td style={tdCenter}>
-                        <button onClick={() => deleteMowing(t.id)} style={deleteBtn}>X</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {/* ---------------- MULCHING ---------------- */}
-                {currentServices.mulching?.map((m) => {
-                  const d = m.data || {};
-                  const occ = d.summary?.numOccurrences || 0;
-                  return (
-                    <tr key={m.id}>
-                      <td style={td}>{d.name || "Mulching Area"}</td>
-                      <td style={tdCenter}>{occ}</td>
-                      <td style={tdCenter}>$0.00</td>
-                      <td style={tdCenter}>$0.00</td>
-                      <td style={tdCenter}>
-                        <button onClick={() => deleteMulching(m.id)} style={deleteBtn}>X</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {/* ---------------- PRUNING ---------------- */}
-                {currentServices.pruning?.map((p) => {
-                  const calc = computePruningTotals(p);
-                  if (!calc) return null;
-
-                  return (
-                    <tr key={p.id}>
-                      <td style={td}>{p.data?.name || "Pruning Area"}</td>
-                      <td style={tdCenter}>{calc.occ}</td>
-                      <td style={tdCenter}>${calc.pricePerOcc.toFixed(2)}</td>
-                      <td style={tdCenter}>${calc.totalDollar.toFixed(2)}</td>
-                      <td style={tdCenter}>
-                        <button onClick={() => deletePruning(p.id)} style={deleteBtn}>X</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {/* ---------------- EDGING ---------------- */}
-                {currentServices.edging && (() => {
-                  const entry = Array.isArray(currentServices.edging)
-                    ? currentServices.edging[0]
-                    : currentServices.edging;
-
-                  const calc = computeEdgingTotals(entry);
-                  if (!calc) return null;
-
-                  return (
-                    <tr>
-                      <td style={td}>Edging</td>
-                      <td style={tdCenter}>{calc.occ}</td>
-                      <td style={tdCenter}>${calc.pricePerOcc.toFixed(2)}</td>
-                      <td style={tdCenter}>${calc.finalTotal.toFixed(2)}</td>
-                      <td style={tdCenter}>
-                        <button onClick={deleteEdging} style={deleteBtn}>X</button>
-                      </td>
-                    </tr>
-                  );
-                })()}
-
-                {/* ---------------- BED MAINT ---------------- */}
-                {currentServices.bedMaintenance && (() => {
-                  const entry = Array.isArray(currentServices.bedMaintenance)
-                    ? currentServices.bedMaintenance[0]
-                    : currentServices.bedMaintenance;
-
-                  const calc = computeBedTotals(entry);
-                  if (!calc) return null;
-
-                  return (
-                    <tr>
-                      <td style={td}>Bed Maintenance</td>
-                      <td style={tdCenter}>{calc.occ}</td>
-                      <td style={tdCenter}>${calc.pricePerOcc.toFixed(2)}</td>
-                      <td style={tdCenter}>${calc.finalTotal.toFixed(2)}</td>
-                      <td style={tdCenter}>
-                        <button onClick={deleteBedMaintenance} style={deleteBtn}>X</button>
-                      </td>
-                    </tr>
-                  );
-                })()}
-
-              </tbody>
-            </table>
+    <main className="app-shell single-column">
+      <section className="workspace-panel wide-panel">
+        <div className="services-header">
+          <div className="page-title">
+            <p>Service Builder</p>
+            <h1>{project.projectName || "New Project"}</h1>
           </div>
-        )}
-      </div>
-    </div>
+          <div className="header-actions">
+            <button className="secondary-button" onClick={() => navigate("/")} type="button">Main Page</button>
+            <button onClick={handleSaveProject} type="button">
+              Save Project
+            </button>
+          </div>
+        </div>
+
+        <div className="summary-strip">
+          <div>
+            <span>Date</span>
+            <strong>{project.date || "Not set"}</strong>
+          </div>
+          <div>
+            <span>Acres</span>
+            <strong>{project.acres || "0"}</strong>
+          </div>
+          <div>
+            <span>Estimated Total</span>
+            <strong>{money(projectTotal)}</strong>
+          </div>
+        </div>
+
+        <section className="service-actions" aria-label="Add services">
+          <button onClick={() => navigate("/services/mowing")} type="button">Mowing</button>
+          <button onClick={() => navigate("/services/mulching")} type="button">Mulching</button>
+          <button onClick={() => navigate("/services/pruning")} type="button">Pruning</button>
+          <button onClick={() => navigate("/services/leaves")} type="button">Leaves</button>
+        </section>
+
+        <section className="summary-panel">
+          <div className="section-heading">
+            <span>Service Summary</span>
+            <strong>{summaryRows.length} saved</strong>
+          </div>
+
+          {summaryRows.length === 0 ? (
+            <div className="empty-state">Add a service to start building this project.</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="summary-table">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Occurrences</th>
+                    <th>Price / Occ</th>
+                    <th>Total</th>
+                    <th aria-label="Actions"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.label}</td>
+                      <td>{row.occ}</td>
+                      <td>{row.pricePerOcc === null ? "-" : money(row.pricePerOcc)}</td>
+                      <td>{row.total === null ? "-" : money(row.total)}</td>
+                      <td>
+                        <button className="danger-button compact-button" onClick={row.onDelete} type="button">
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="3">Estimated Project Total</td>
+                    <td>{money(projectTotal)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
   );
 }
-
-const th = {
-  borderBottom: "1px solid #ccc",
-  textAlign: "center",
-  padding: "4px",
-};
-
-const td = { padding: "4px" };
-
-const tdCenter = { padding: "4px", textAlign: "center" };
-
-const deleteBtn = {
-  background: "#dc3545",
-  color: "white",
-  border: "none",
-  padding: "4px 8px",
-  borderRadius: "4px",
-  cursor: "pointer",
-};

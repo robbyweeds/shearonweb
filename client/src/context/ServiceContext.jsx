@@ -2,7 +2,7 @@
 // ServiceContext.jsx — FINAL FIXED VERSION
 // =====================================
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 const ServiceContext = createContext(null);
 
@@ -107,29 +107,29 @@ export function ServiceProvider({ children }) {
   // ----------------------------------------
   // SERVICE UPDATE
   // ----------------------------------------
-  const updateService = (serviceName, data) => {
+  const updateService = useCallback((serviceName, data) => {
     setCurrentServices((prev) => ({
       ...prev,
       [serviceName]: data,
     }));
-  };
+  }, []);
 
-  const getAllServices = () => currentServices;
+  const getAllServices = useCallback(() => currentServices, [currentServices]);
 
   // ----------------------------------------
   // RATE UPDATE
   // ----------------------------------------
-  const updateRates = (key, value) => {
+  const updateRates = useCallback((key, value) => {
     setCurrentRates((prev) => ({
       ...prev,
       [key]: value,
     }));
-  };
+  }, []);
 
   // ----------------------------------------
   // RESET ALL SERVICES
   // ----------------------------------------
-  const resetServices = () => {
+  const resetServices = useCallback(() => {
     setCurrentServices({
       mowing: [],
       edging: null,
@@ -138,19 +138,29 @@ export function ServiceProvider({ children }) {
       pruning: [],   // ✅ FIXED (was null — must stay an array)
       leaves: null,
     });
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      currentServices,
+      updateService,
+      getAllServices,
+      currentRates,
+      updateRates,
+      resetServices,
+    }),
+    [
+      currentServices,
+      updateService,
+      getAllServices,
+      currentRates,
+      updateRates,
+      resetServices,
+    ]
+  );
 
   return (
-    <ServiceContext.Provider
-      value={{
-        currentServices,
-        updateService,
-        getAllServices,
-        currentRates,
-        updateRates,
-        resetServices,
-      }}
-    >
+    <ServiceContext.Provider value={value}>
       {children}
     </ServiceContext.Provider>
   );

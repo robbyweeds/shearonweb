@@ -132,7 +132,7 @@ app.get("/project/:id", (req, res) => {
 
     const parsedServices = {};
     services.forEach((s) => {
-      parsedServices[s.type] = JSON.parse(s.data);
+      parsedServices[s.service_type] = JSON.parse(s.data);
     });
 
     res.json({ success: true, project, services: parsedServices });
@@ -154,6 +154,46 @@ app.delete("/project/:id", (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
+  }
+});
+
+// -----------------------------------------------------
+// UPDATE PROJECT + SERVICES
+// -----------------------------------------------------
+app.put("/project/:id", (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { project, services } = req.body;
+    const { projectName, date, acres } = project;
+
+    const updateProject = db.prepare(
+      "UPDATE projects SET project_name = ?, date = ?, acres = ? WHERE id = ?"
+    );
+    const deleteServices = db.prepare("DELETE FROM services WHERE project_id = ?");
+    const insertService = db.prepare(
+      "INSERT INTO services (project_id, service_type, data) VALUES (?, ?, ?)"
+    );
+
+    const saveExistingProject = db.transaction(() => {
+      const result = updateProject.run(projectName, date, acres, projectId);
+
+      if (result.changes === 0) {
+        throw new Error("Project not found");
+      }
+
+      deleteServices.run(projectId);
+
+      for (const [type, data] of Object.entries(services || {})) {
+        insertService.run(projectId, type, JSON.stringify(data));
+      }
+    });
+
+    saveExistingProject();
+
+    res.json({ success: true, projectId: Number(projectId) });
+  } catch (err) {
+    const status = err.message === "Project not found" ? 404 : 500;
+    res.status(status).json({ success: false, error: err.message });
   }
 });
 

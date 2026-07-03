@@ -10,8 +10,7 @@ import ServiceTablesWrapper from "./ServiceTablesWrapper";
 export default function MowingForm() {
   const navigate = useNavigate();
 
-  const { currentServices, updateService, getAllServices } =
-    useServiceContext();
+  const { updateService, getAllServices } = useServiceContext();
 
   const [tables, setTables] = useState([]);
 
