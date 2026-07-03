@@ -11,8 +11,14 @@ const SAVED_RATES_KEY = "__rates";
 
 export default function ServicesPage() {
   const navigate = useNavigate();
-  const { currentServices, updateService, getAllServices, currentRates } =
-    useServiceContext();
+  const {
+    currentServices,
+    updateService,
+    getAllServices,
+    currentRates,
+    resetServices,
+    resetRates,
+  } = useServiceContext();
 
   const [project, setProject] = useState({
     projectName: "",
@@ -22,8 +28,16 @@ export default function ServicesPage() {
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("project"));
-    if (stored) setProject(stored);
-  }, []);
+
+    if (stored) {
+      if (!stored.id) {
+        resetServices();
+        resetRates();
+      }
+
+      setProject(stored);
+    }
+  }, [resetServices, resetRates]);
 
   const deleteMowing = (id) =>
     updateService(

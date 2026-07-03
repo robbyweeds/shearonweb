@@ -140,6 +140,15 @@ export function ServiceProvider({ children }) {
     });
   }, []);
 
+  const resetRates = useCallback(() => {
+    setCurrentRates({
+      mowingFactors: DEFAULT_MOWING_FACTORS,
+      mowingDollars: DEFAULT_MOWING_DOLLARS,
+      mulchingRates: null,
+      pruningRates: null,
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       currentServices,
@@ -148,6 +157,7 @@ export function ServiceProvider({ children }) {
       currentRates,
       updateRates,
       resetServices,
+      resetRates,
     }),
     [
       currentServices,
@@ -156,6 +166,7 @@ export function ServiceProvider({ children }) {
       currentRates,
       updateRates,
       resetServices,
+      resetRates,
     ]
   );
 

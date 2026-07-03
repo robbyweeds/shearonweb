@@ -8,7 +8,7 @@ const EMPTY_PROJECT = { id: null, projectName: "", date: "", acres: "" };
 
 export default function ProjectForm() {
   const navigate = useNavigate();
-  const { updateService, resetServices, updateRates } = useServiceContext();
+  const { updateService, resetServices, resetRates, updateRates } = useServiceContext();
 
   const [projects, setProjects] = useState([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
@@ -33,7 +33,9 @@ export default function ProjectForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setSelectedProjectId("");
+    setFormData((prev) => ({ ...prev, id: null, [name]: value }));
   };
 
   const isEmptyObject = (value) =>
@@ -108,6 +110,7 @@ export default function ProjectForm() {
             setSelectedProjectId("");
             setFormData(EMPTY_PROJECT);
             resetServices();
+            resetRates();
             localStorage.removeItem("project");
           }
 
@@ -129,7 +132,9 @@ export default function ProjectForm() {
     const project = { ...formData, id: formData.id || null };
 
     if (!project.id) {
+      setSelectedProjectId("");
       resetServices();
+      resetRates();
     }
 
     localStorage.setItem("project", JSON.stringify(project));
