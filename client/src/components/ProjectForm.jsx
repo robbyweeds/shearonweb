@@ -4,6 +4,7 @@ import { useServiceContext } from "../context/ServiceContext";
 
 const API_URL = process.env.REACT_APP_API_URL || "";
 const SAVED_RATES_KEY = "__rates";
+const EMPTY_PROJECT = { id: null, projectName: "", date: "", acres: "" };
 
 export default function ProjectForm() {
   const navigate = useNavigate();
@@ -12,12 +13,7 @@ export default function ProjectForm() {
   const [projects, setProjects] = useState([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [formData, setFormData] = useState({
-    id: null,
-    projectName: "",
-    date: "",
-    acres: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_PROJECT);
 
   useEffect(() => {
     fetchProjects();
@@ -102,7 +98,19 @@ export default function ProjectForm() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          if (String(projectId) === String(selectedProjectId)) setSelectedProjectId("");
+          const storedProject = JSON.parse(localStorage.getItem("project") || "null");
+          const deletedCurrentProject =
+            String(projectId) === String(selectedProjectId) ||
+            String(projectId) === String(formData.id) ||
+            String(projectId) === String(storedProject?.id);
+
+          if (deletedCurrentProject) {
+            setSelectedProjectId("");
+            setFormData(EMPTY_PROJECT);
+            resetServices();
+            localStorage.removeItem("project");
+          }
+
           fetchProjects();
         } else {
           alert("Failed to delete project: " + data.error);
@@ -118,7 +126,13 @@ export default function ProjectForm() {
       return;
     }
 
-    localStorage.setItem("project", JSON.stringify(formData));
+    const project = { ...formData, id: formData.id || null };
+
+    if (!project.id) {
+      resetServices();
+    }
+
+    localStorage.setItem("project", JSON.stringify(project));
     navigate("/services");
   };
 

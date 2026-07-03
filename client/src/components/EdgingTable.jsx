@@ -58,7 +58,7 @@ export default function EdgingTable() {
 
   const totalOccDollar = totalRow.EDGER + totalRow.BLOWER;
 
-  const finalTotal = totalOccDollar * (data.summary.numOccurrences || 1);
+  const finalTotal = totalOccDollar * Number(data.summary.numOccurrences || 0);
 
   // Save including required fields
   const save = (updatedData) => {

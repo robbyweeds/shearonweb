@@ -149,10 +149,13 @@ export default function ServicesPage() {
 
     mowingEntries.forEach((entry) => {
       const { merged, totals } = computeMowingPreview(entry);
+      const occ = Number(merged.summary?.numOccurrences || 0);
+      if (occ <= 0) return;
+
       rows.push({
         id: `mowing-${entry.id}`,
         label: merged.name || "Mowing Area",
-        occ: merged.summary?.numOccurrences || 0,
+        occ,
         pricePerOcc: totals.adjustedOcc,
         total: totals.final,
         onDelete: () => deleteMowing(entry.id),
@@ -161,10 +164,13 @@ export default function ServicesPage() {
 
     mulchingEntries.forEach((entry) => {
       const data = entry.data || {};
+      const occ = Number(data.summary?.numOccurrences || 0);
+      if (occ <= 0) return;
+
       rows.push({
         id: `mulching-${entry.id}`,
         label: data.name || "Mulching Area",
-        occ: data.summary?.numOccurrences || 0,
+        occ,
         pricePerOcc: 0,
         total: 0,
         onDelete: () => deleteMulching(entry.id),
@@ -173,7 +179,7 @@ export default function ServicesPage() {
 
     pruningEntries.forEach((entry) => {
       const calc = computePruningTotals(entry);
-      if (!calc) return;
+      if (!calc || Number(calc.occ || 0) <= 0) return;
 
       rows.push({
         id: `pruning-${entry.id}`,
@@ -191,7 +197,7 @@ export default function ServicesPage() {
         : currentServices.edging;
       const calc = computeEdgingTotals(entry);
 
-      if (calc) {
+      if (calc && Number(calc.occ || 0) > 0) {
         rows.push({
           id: "edging",
           label: "Edging",
@@ -209,7 +215,7 @@ export default function ServicesPage() {
         : currentServices.bedMaintenance;
       const calc = computeBedTotals(entry);
 
-      if (calc) {
+      if (calc && Number(calc.occ || 0) > 0) {
         rows.push({
           id: "bedMaintenance",
           label: "Bed Maintenance",

@@ -61,7 +61,7 @@ export default function BedMaintenanceTable() {
     totalRow.HAND + totalRow.BACKPACK + totalRow.ROUNDUP;
 
   const finalTotal =
-    totalOccDollar * (data.summary.numOccurrences || 1);
+    totalOccDollar * Number(data.summary.numOccurrences || 0);
 
   // -------------------------
   // SAVE one fixed table
