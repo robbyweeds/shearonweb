@@ -25,6 +25,14 @@ export default function ServicesPage() {
     if (stored) setProject(stored);
   }, []);
 
+  const handleProjectFieldChange = (field, value) => {
+    setProject((prev) => {
+      const updated = { ...prev, [field]: value };
+      localStorage.setItem("project", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const deleteMowing = (id) =>
     updateService(
       "mowing",
@@ -311,8 +319,19 @@ export default function ServicesPage() {
             <strong>{project.date || "Not set"}</strong>
           </div>
           <div>
-            <span>Acres</span>
-            <strong>{project.acres || "0"}</strong>
+            <label className="summary-field-label" htmlFor="project-acres">
+              Acres
+            </label>
+            <input
+              id="project-acres"
+              className="summary-field-input"
+              type="number"
+              value={project.acres || ""}
+              onChange={(e) => handleProjectFieldChange("acres", e.target.value)}
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+            />
           </div>
           <div>
             <span>Estimated Total</span>

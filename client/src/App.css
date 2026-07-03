@@ -197,6 +197,42 @@ button:focus-visible {
   margin-top: 0.5rem;
 }
 
+.service-entry-page {
+  padding: 2rem;
+}
+
+.pruning-entry-page {
+  margin: 0 auto;
+  max-width: 600px;
+  padding: 1rem;
+}
+
+.service-tool-row,
+.service-page-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.service-tool-row {
+  margin-top: 1rem;
+}
+
+.service-page-actions {
+  margin-top: 2rem;
+}
+
+.pruning-page-actions {
+  margin-top: 1rem;
+}
+
+.service-tool-row button,
+.service-page-actions button {
+  flex: 0 1 auto;
+  min-width: 120px;
+}
+
 .project-list {
   display: grid;
   gap: 0.75rem;
@@ -298,6 +334,20 @@ button:focus-visible {
   font-size: 1.15rem;
 }
 
+.summary-field-label {
+  color: var(--muted);
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.summary-field-input {
+  min-height: 0;
+  padding: 0.35rem 0.45rem;
+  width: 120px;
+}
+
 .service-actions {
   border-bottom: 1px solid var(--line);
   border-top: 1px solid var(--line);
@@ -372,6 +422,18 @@ button:focus-visible {
   }
 
   button {
+    width: 100%;
+  }
+
+  .service-tool-row,
+  .service-page-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .service-tool-row button,
+  .service-page-actions button {
+    min-width: 0;
     width: 100%;
   }
 

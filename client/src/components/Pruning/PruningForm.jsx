@@ -7,6 +7,11 @@ import { useServiceContext } from "../../context/ServiceContext";
 import PruningTable from "./PruningTable";
 import { INITIAL_PRUNING_TABLE } from "./pruningDefaults";
 
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const getDefaultPruningTables = () => [
+  { id: "Pruning1", data: clone(INITIAL_PRUNING_TABLE) },
+];
+
 export default function PruningForm() {
   const { currentServices, updateService } = useServiceContext();
   const navigate = useNavigate();
@@ -17,13 +22,14 @@ export default function PruningForm() {
     : [];
 
   const [tables, setTables] = useState(initialList);
+  const [resetNonce, setResetNonce] = useState(0);
 
   // -----------------------------
   // Load pruning tables on mount
   // -----------------------------
   useEffect(() => {
     if (!Array.isArray(currentServices.pruning) || currentServices.pruning.length === 0) {
-      const first = [{ id: "Pruning1", data: INITIAL_PRUNING_TABLE }];
+      const first = getDefaultPruningTables();
       setTables(first);
       updateService("pruning", first); // save initial
     } else {
@@ -39,7 +45,7 @@ export default function PruningForm() {
 
     const newTable = {
       id: newId,
-      data: INITIAL_PRUNING_TABLE,
+      data: clone(INITIAL_PRUNING_TABLE),
     };
 
     const updated = [...tables, newTable];
@@ -58,8 +64,19 @@ export default function PruningForm() {
     updateService("pruning", updated);
   };
 
+  const handleSave = () => {
+    navigate("/services");
+  };
+
+  const handleReset = () => {
+    const defaults = getDefaultPruningTables();
+    setTables(defaults);
+    updateService("pruning", defaults);
+    setResetNonce((value) => value + 1);
+  };
+
   return (
-    <div style={{ padding: "1rem", maxWidth: "600px", margin: "auto" }}>
+    <div className="service-entry-page pruning-entry-page">
       <h2 style={{ marginBottom: "1rem" }}>Pruning</h2>
 
       {tables.map((t) => (
@@ -73,7 +90,7 @@ export default function PruningForm() {
             background: "#fafafa",
           }}
         >
-          <PruningTable tableId={t.id} />
+          <PruningTable key={`${t.id}-${resetNonce}`} tableId={t.id} />
 
           <div style={{ textAlign: "right" }}>
             <button
@@ -94,33 +111,20 @@ export default function PruningForm() {
         </div>
       ))}
 
-      <div style={{ marginTop: "1rem" }}>
-        <button
-          onClick={addTable}
-          style={{
-            marginRight: "1rem",
-            padding: "6px 12px",
-            background: "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+      <div className="service-page-actions pruning-page-actions">
+        <button onClick={addTable} type="button">
           Add Pruning Table
         </button>
 
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            padding: "6px 12px",
-            background: "#6c757d",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={handleSave} type="button">
+          Save
+        </button>
+
+        <button className="danger-button" onClick={handleReset} type="button">
+          Reset
+        </button>
+
+        <button className="secondary-button" onClick={() => navigate(-1)} type="button">
           Back
         </button>
       </div>

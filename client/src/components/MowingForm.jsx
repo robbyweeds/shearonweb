@@ -6,6 +6,12 @@ import { useServiceContext } from "../context/ServiceContext";
 
 import MowingTable from "./Mowing/MowingTable";
 import ServiceTablesWrapper from "./ServiceTablesWrapper";
+import { INITIAL_MOWING_DATA } from "./Mowing/mowingDefaults";
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const getDefaultMowingTables = () => [
+  { id: "Mowing1", data: clone(INITIAL_MOWING_DATA) },
+];
 
 export default function MowingForm() {
   const navigate = useNavigate();
@@ -25,7 +31,7 @@ export default function MowingForm() {
 
     // If no mowing tables, create the first one locally AND in context
     if (mowing.length === 0) {
-      const first = [{ id: "Mowing1", data: {} }];
+      const first = getDefaultMowingTables();
       setTables(first);
       updateService("mowing", first);
     } else {
@@ -38,14 +44,24 @@ export default function MowingForm() {
   // ---------------------------------------------------------
   const addTable = () => {
     const newId = `Mowing${tables.length + 1}`;
-    const updated = [...tables, { id: newId, data: {} }];
+    const updated = [...tables, { id: newId, data: clone(INITIAL_MOWING_DATA) }];
 
     updateService("mowing", updated);
     setTables(updated);
   };
 
+  const handleSave = () => {
+    navigate("/services");
+  };
+
+  const handleReset = () => {
+    const defaults = getDefaultMowingTables();
+    updateService("mowing", defaults);
+    setTables(defaults);
+  };
+
   return (
-    <div style={{ padding: "2rem" }}>
+    <div className="service-entry-page">
       <h2>Service Entry</h2>
 
       {/* Edging + Bed Maintenance stay attached and never reset */}
@@ -57,23 +73,29 @@ export default function MowingForm() {
         <MowingTable key={t.id} tableId={t.id} />
       ))}
 
-      <div style={{ marginTop: "1rem" }}>
-        <button onClick={addTable}>Add Mowing Table</button>
+      <div className="service-tool-row">
+        <button onClick={addTable} type="button">Add Mowing Table</button>
 
-        <button
-          onClick={() => navigate("/mowing-rates")}
-          style={{ marginLeft: "1rem" }}
-        >
+        <button onClick={() => navigate("/mowing-rates")} type="button">
           Edit Mowing Rates
         </button>
       </div>
 
-      <button
-        onClick={() => navigate(-1)}
-        style={{ marginTop: "2rem" }}
-      >
-        Back
-      </button>
+      <div className="service-page-actions">
+        <button onClick={handleSave} type="button">
+          Save
+        </button>
+        <button className="danger-button" onClick={handleReset} type="button">
+          Reset
+        </button>
+        <button
+          className="secondary-button"
+          onClick={() => navigate(-1)}
+          type="button"
+        >
+          Back
+        </button>
+      </div>
     </div>
   );
 }

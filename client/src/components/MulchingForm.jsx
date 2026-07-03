@@ -3,6 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../context/ServiceContext";
 
 import MulchingPage from "./Mulching/MulchingPage";
+import { INITIAL_MULCHING_DATA } from "./Mulching/mulchingDefaults";
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const getDefaultMulchingTables = () => [
+  { id: "Mulch1", data: clone(INITIAL_MULCHING_DATA) },
+];
 
 export default function MulchingForm() {
   const navigate = useNavigate();
@@ -19,7 +25,7 @@ export default function MulchingForm() {
 
     // if no tables yet, create one
     if (mulching.length === 0) {
-      const first = [{ id: "Mulch1", data: {} }];
+      const first = getDefaultMulchingTables();
       setTables(first);
       updateService("mulching", first);
     } else {
@@ -29,37 +35,53 @@ export default function MulchingForm() {
 
   const addTable = () => {
     const newId = `Mulch${tables.length + 1}`;
-    const updated = [...tables, { id: newId, data: {} }];
+    const updated = [...tables, { id: newId, data: clone(INITIAL_MULCHING_DATA) }];
 
     updateService("mulching", updated);
     setTables(updated);
   };
 
+  const handleSave = () => {
+    navigate("/services");
+  };
+
+  const handleReset = () => {
+    const defaults = getDefaultMulchingTables();
+    updateService("mulching", defaults);
+    setTables(defaults);
+  };
+
   return (
-    <div style={{ padding: "2rem" }}>
+    <div className="service-entry-page">
       <h2>Mulching</h2>
 
       {tables.map((t) => (
         <MulchingPage key={t.id} tableId={t.id} />
       ))}
 
-      <div style={{ marginTop: "1rem" }}>
-        <button onClick={addTable}>Add Mulching Table</button>
+      <div className="service-tool-row">
+        <button onClick={addTable} type="button">Add Mulching Table</button>
 
-        <button
-          onClick={() => navigate("/mulching-rates")}
-          style={{ marginLeft: "1rem" }}
-        >
+        <button onClick={() => navigate("/mulching-rates")} type="button">
           Edit Mulching Rates
         </button>
       </div>
 
-      <button
-        onClick={() => navigate(-1)}
-        style={{ marginTop: "2rem" }}
-      >
-        Back
-      </button>
+      <div className="service-page-actions">
+        <button onClick={handleSave} type="button">
+          Save
+        </button>
+        <button className="danger-button" onClick={handleReset} type="button">
+          Reset
+        </button>
+        <button
+          className="secondary-button"
+          onClick={() => navigate(-1)}
+          type="button"
+        >
+          Back
+        </button>
+      </div>
     </div>
   );
 }

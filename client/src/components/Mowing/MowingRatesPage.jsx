@@ -7,15 +7,6 @@ import { useNavigate } from "react-router-dom";
 import LabeledInput from "../LabeledInput";
 import { useServiceContext } from "../../context/ServiceContext";
 
-import {
-  DECK_KEYS,
-  EFFICIENCY_OPTIONS,
-  SMPWR_EFFICIENCY_OPTIONS,
-  SMPWR_KEYS,
-  ROTARY_KEY,
-  DISPLAY_KEYS,
-  INITIAL_MOWING_DATA,
-} from "./mowingDefaults";
 
 // ==========================================================
 //  DEFAULTS (moved here because mowingDefaults does NOT export them)
@@ -129,6 +120,13 @@ export default function MowingRatesPage() {
     updateRates("mowingFactors", rates.factors);
     updateRates("mowingDollars", rates.dollars);
     alert("Mowing Rates Updated!");
+  };
+
+  const handleResetToDefault = () => {
+    setRates({
+      factors: DEFAULT_FACTORS,
+      dollars: DEFAULT_DOLLARS,
+    });
   };
 
   // ======================================================
@@ -363,35 +361,49 @@ export default function MowingRatesPage() {
       {renderSmPwrAllocation}
       {renderDollarRates}
 
-      <button
-        onClick={handleSaveRates}
-        style={{
-          marginTop: "2rem",
-          padding: "10px 24px",
-          backgroundColor: "#28a745",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        Save Rates
-      </button>
+      <div style={{ display: "flex", gap: "0.75rem", marginTop: "2rem", flexWrap: "wrap" }}>
+        <button
+          onClick={handleSaveRates}
+          style={{
+            padding: "10px 24px",
+            backgroundColor: "#28a745",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          Save Rates
+        </button>
 
-      <button
-        onClick={() => navigate(-1)}
-        style={{
-          marginLeft: "1rem",
-          padding: "10px 24px",
-          backgroundColor: "#6c757d",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        Back
-      </button>
+        <button
+          onClick={handleResetToDefault}
+          style={{
+            padding: "10px 24px",
+            backgroundColor: "#dc3545",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          Reset to Default
+        </button>
+
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            padding: "10px 24px",
+            backgroundColor: "#6c757d",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          Back
+        </button>
+      </div>
     </div>
   );
 }

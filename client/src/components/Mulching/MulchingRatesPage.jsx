@@ -3,7 +3,7 @@ import { useServiceContext } from "../../context/ServiceContext";
 import { DEFAULT_MULCHING_RATES } from "./mulchingDefaults";
 
 export default function MulchingRatesPage() {
-  const { currentRates, updateService } = useServiceContext();
+  const { currentRates, updateRates } = useServiceContext();
 
   const savedMulchingRates =
     currentRates?.mulchingRates || DEFAULT_MULCHING_RATES;
@@ -35,10 +35,7 @@ export default function MulchingRatesPage() {
   };
 
   const handleSave = () => {
-    updateService("rates", {
-      ...currentRates,
-      mulchingRates: localRates,
-    });
+    updateRates("mulchingRates", localRates);
   };
 
   const handleCancel = () => {

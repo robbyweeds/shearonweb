@@ -33,9 +33,7 @@ export default function ProjectForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setSelectedProjectId("");
-    setFormData((prev) => ({ ...prev, id: null, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const isEmptyObject = (value) =>

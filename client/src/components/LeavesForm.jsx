@@ -2,14 +2,16 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../context/ServiceContext";
 
+const EMPTY_LEAVES = {
+  area: "",
+  quantity: "",
+};
+
 export default function LeavesForm() {
   const { currentServices, updateService } = useServiceContext();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    area: "",
-    quantity: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_LEAVES);
 
   useEffect(() => {
     if (currentServices.leaves) setFormData(currentServices.leaves);
@@ -24,6 +26,11 @@ export default function LeavesForm() {
     e.preventDefault();
     updateService("leaves", formData);
     navigate("/services");
+  };
+
+  const handleReset = () => {
+    setFormData(EMPTY_LEAVES);
+    updateService("leaves", null);
   };
 
   return (
@@ -57,8 +64,11 @@ export default function LeavesForm() {
             />
           </label>
 
-          <div className="button-row form-actions">
+          <div className="service-page-actions form-actions">
             <button type="submit">Save Leaves</button>
+            <button className="danger-button" onClick={handleReset} type="button">
+              Reset
+            </button>
             <button className="secondary-button" onClick={() => navigate(-1)} type="button">
               Back
             </button>

@@ -1,15 +1,8 @@
 // myapp/client/src/components/Pruning/PruningRatesPage.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../../context/ServiceContext";
-
-// Default pruning rates if none exist yet
-const DEFAULT_PRUNING_RATES = {
-  HAND: 51,
-  SHEARS: 51,
-  CLEAN_UP: 55,
-  MISC: 51
-};
+import { DEFAULT_PRUNING_RATES } from "./pruningDefaults";
 
 export default function PruningRatesPage() {
   const navigate = useNavigate();
@@ -33,6 +26,10 @@ export default function PruningRatesPage() {
   const handleSave = () => {
     updateRates("pruningRates", rates);
     navigate("/services");
+  };
+
+  const handleResetToDefault = () => {
+    setRates(DEFAULT_PRUNING_RATES);
   };
 
   return (
@@ -89,6 +86,21 @@ export default function PruningRatesPage() {
         }}
       >
         Save Rates
+      </button>
+
+      <button
+        onClick={handleResetToDefault}
+        style={{
+          marginLeft: "1rem",
+          padding: "10px 20px",
+          background: "#dc3545",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          cursor: "pointer"
+        }}
+      >
+        Reset to Default
       </button>
 
       <button
