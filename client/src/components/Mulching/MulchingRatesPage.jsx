@@ -1,45 +1,36 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../../context/ServiceContext";
 import { DEFAULT_MULCHING_RATES } from "./mulchingDefaults";
+import { mergeMulchingRates } from "./mulchingCalculations";
 
 export default function MulchingRatesPage() {
+  const navigate = useNavigate();
   const { currentRates, updateRates } = useServiceContext();
 
-  const savedMulchingRates =
-    currentRates?.mulchingRates || DEFAULT_MULCHING_RATES;
+  const savedMulchingRates = mergeMulchingRates(
+    currentRates?.mulchingRates || DEFAULT_MULCHING_RATES
+  );
 
   const [localRates, setLocalRates] = useState(savedMulchingRates);
 
-  // When saved rates change (e.g., reload), reset local state
   useEffect(() => {
     setLocalRates(savedMulchingRates);
-  }, [savedMulchingRates]);
+  }, [currentRates?.mulchingRates]);
 
-  const handleRateChange = (category, key, value) => {
-    const num = value === "" ? "" : Number(value);
+  const setCategoryRate = (category, key, value) => {
     setLocalRates((prev) => ({
       ...prev,
       [category]: {
         ...prev[category],
-        [key]: num,
+        [key]: value === "" ? "" : Number(value),
       },
-    }));
-  };
-
-  const handlePriceFieldChange = (field, value) => {
-    const num = value === "" ? "" : Number(value);
-    setLocalRates((prev) => ({
-      ...prev,
-      [field]: num,
     }));
   };
 
   const handleSave = () => {
     updateRates("mulchingRates", localRates);
-  };
-
-  const handleCancel = () => {
-    setLocalRates(savedMulchingRates);
+    alert("Mulching Rates Updated!");
   };
 
   const handleReset = () => {
@@ -66,17 +57,27 @@ export default function MulchingRatesPage() {
   };
 
   const inputStyle = {
-    width: "80px",
+    width: "90px",
     padding: "2px 4px",
     fontSize: "0.85rem",
   };
 
-  const renderRateTable = (label, category, valueLabel) => {
+  const input = (category, key, step = "0.01") => (
+    <input
+      type="number"
+      step={step}
+      value={localRates[category]?.[key] ?? ""}
+      onChange={(e) => setCategoryRate(category, key, e.target.value)}
+      style={inputStyle}
+    />
+  );
+
+  const renderSingleRowTable = (title, category, valueLabel, step = "0.01") => {
     const entries = Object.keys(localRates[category] || {});
 
     return (
       <>
-        <h3 style={{ marginTop: "1rem" }}>{label}</h3>
+        <h3 style={{ marginTop: "1rem" }}>{title}</h3>
         <table style={tableStyle}>
           <thead>
             <tr>
@@ -88,17 +89,7 @@ export default function MulchingRatesPage() {
             {entries.map((key) => (
               <tr key={key}>
                 <td style={tdStyle}>{key}</td>
-                <td style={tdStyle}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={localRates[category][key]}
-                    onChange={(e) =>
-                      handleRateChange(category, key, e.target.value)
-                    }
-                    style={inputStyle}
-                  />
-                </td>
+                <td style={tdStyle}>{input(category, key, step)}</td>
               </tr>
             ))}
           </tbody>
@@ -108,121 +99,34 @@ export default function MulchingRatesPage() {
   };
 
   return (
-    <div
-      style={{
-        marginTop: "0.5rem",
-        padding: "1rem",
-        border: "1px solid #ccc",
-        borderRadius: "6px",
-        maxWidth: "900px",
-        background: "#fff",
-      }}
-    >
+    <div style={{ marginTop: "0.5rem", padding: "1rem", border: "1px solid #ccc", maxWidth: "1000px", background: "#fff" }}>
       <h2 style={{ marginTop: 0 }}>Mulching Rates</h2>
 
-      {renderRateTable("Hand Labor Production (Yards per Man-Hour)", "handEfficiency", "Yards / Man-Hour")}
-      {renderRateTable("Sm Pwr Production (Yards per Man-Hour)", "smPowerManHours", "Yards / Man-Hour")}
-      {renderRateTable("Loader Production (Yards per Man-Hour)", "loaderManHours", "Yards / Man-Hour")}
+      {renderSingleRowTable("Dollar Rates", "dollars", "Rate", "0.01")}
+      {renderSingleRowTable("Hand Application Efficiency - Yards per Man Hour", "handEfficiency", "Yards / Man Hour", "0.01")}
+      {renderSingleRowTable("Tree Ring Size", "treeRingSize", "Diameter", "0.01")}
+      {renderSingleRowTable("Tree Efficiency", "treeEfficiency", "Yards / Man Hour", "0.01")}
+      {renderSingleRowTable("Mulch Depth", "depthInches", "Inches", "0.01")}
+      {renderSingleRowTable("Depth of Mulch Around Trees", "treeDepth", "Inches", "0.01")}
+      {renderSingleRowTable("Sm Pwr", "smPowerManHours", "Manhours per Sm Pwr hr", "0.01")}
+      {renderSingleRowTable("Loader", "loaderManHours", "Manhours per Loader hr", "0.01")}
+      {renderSingleRowTable("Proximity to Pile", "proximity", "Multiplier", "0.01")}
+      {renderSingleRowTable("Finn Yards per Hour", "finnEfficiency", "Yards / Hour", "0.01")}
+      {renderSingleRowTable("Finn Depth", "finnDepth", "Inches", "0.01")}
+      {renderSingleRowTable("Finn Helper", "finnHelper", "Helper hrs per Finn hr", "0.01")}
 
-      <h3 style={{ marginTop: "1rem" }}>Pricing</h3>
-      <table style={tableStyle}>
-        <tbody>
-          <tr>
-            <td style={tdStyle}>Hand Labor Rate ($/hr)</td>
-            <td style={tdStyle}>
-              <input
-                type="number"
-                step="0.01"
-                value={localRates.handLaborRatePerHour ?? ""}
-                onChange={(e) =>
-                  handlePriceFieldChange("handLaborRatePerHour", e.target.value)
-                }
-                style={inputStyle}
-              />
-            </td>
-          </tr>
-          <tr>
-            <td style={tdStyle}>Sm Pwr Rate ($/hr)</td>
-            <td style={tdStyle}>
-              <input
-                type="number"
-                step="0.01"
-                value={localRates.smPwrRatePerHour ?? ""}
-                onChange={(e) =>
-                  handlePriceFieldChange("smPwrRatePerHour", e.target.value)
-                }
-                style={inputStyle}
-              />
-            </td>
-          </tr>
-          <tr>
-            <td style={tdStyle}>Loader Rate ($/hr)</td>
-            <td style={tdStyle}>
-              <input
-                type="number"
-                step="0.01"
-                value={localRates.loaderRatePerHour ?? ""}
-                onChange={(e) =>
-                  handlePriceFieldChange("loaderRatePerHour", e.target.value)
-                }
-                style={inputStyle}
-              />
-            </td>
-          </tr>
-          <tr>
-            <td style={tdStyle}>Mulch Price per Yard ($/yard)</td>
-            <td style={tdStyle}>
-              <input
-                type="number"
-                step="0.01"
-                value={localRates.mulchPricePerYard ?? ""}
-                onChange={(e) =>
-                  handlePriceFieldChange("mulchPricePerYard", e.target.value)
-                }
-                style={inputStyle}
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-        <button
-          onClick={handleSave}
-          style={{
-            padding: "0.4rem 0.75rem",
-            background: "#4caf50",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <button onClick={handleSave} style={{ padding: "0.4rem 0.75rem", background: "#4caf50", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
           Save
         </button>
-        <button
-          onClick={handleCancel}
-          style={{
-            padding: "0.4rem 0.75rem",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={() => setLocalRates(savedMulchingRates)} style={{ padding: "0.4rem 0.75rem", border: "1px solid #ccc", borderRadius: "4px", cursor: "pointer" }}>
           Cancel
         </button>
-        <button
-          onClick={handleReset}
-          style={{
-            padding: "0.4rem 0.75rem",
-            background: "#e57373",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={handleReset} style={{ padding: "0.4rem 0.75rem", background: "#e57373", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
           Reset to Default
+        </button>
+        <button onClick={() => navigate(-1)} style={{ padding: "0.4rem 0.75rem", border: "1px solid #ccc", borderRadius: "4px", cursor: "pointer" }}>
+          Back
         </button>
       </div>
     </div>

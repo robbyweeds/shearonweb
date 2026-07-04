@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import LabeledInput from "./LabeledInput";
 import { useServiceContext } from "../context/ServiceContext";
+import { formatCurrency } from "../utils/formatters";
 
 const INITIAL = {
   qtyUnit: { HAND: 0, BACKPACK: 0, ROUNDUP: 0 },
@@ -154,24 +155,24 @@ export default function BedMaintenanceTable() {
         {/* UNIT PRICE */}
         <tr>
           <td>UNIT $</td>
-          <td>${data.unitPrice.HAND.toFixed(2)}</td>
-          <td>${data.unitPrice.BACKPACK.toFixed(2)}</td>
-          <td>${data.unitPrice.ROUNDUP.toFixed(2)}</td>
+          <td>{formatCurrency(data.unitPrice.HAND)}</td>
+          <td>{formatCurrency(data.unitPrice.BACKPACK)}</td>
+          <td>{formatCurrency(data.unitPrice.ROUNDUP)}</td>
 
           <td>$/OCC</td>
-          <td style={{ background: "#eef" }}>{totalOccDollar.toFixed(2)}</td>
+          <td style={{ background: "#eef" }}>{formatCurrency(totalOccDollar)}</td>
         </tr>
 
         {/* TOTAL */}
         <tr style={{ fontWeight: "bold", background: "#f4f4f4" }}>
           <td>TOTAL</td>
-          <td>${totalRow.HAND.toFixed(2)}</td>
-          <td>${totalRow.BACKPACK.toFixed(2)}</td>
-          <td>${totalRow.ROUNDUP.toFixed(2)}</td>
+          <td>{formatCurrency(totalRow.HAND)}</td>
+          <td>{formatCurrency(totalRow.BACKPACK)}</td>
+          <td>{formatCurrency(totalRow.ROUNDUP)}</td>
 
           <td>TOTAL $</td>
           <td style={{ background: "#f4f4f4" }}>
-            {finalTotal.toFixed(2)}
+            {formatCurrency(finalTotal)}
           </td>
         </tr>
       </tbody>

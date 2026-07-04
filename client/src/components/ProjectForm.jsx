@@ -43,11 +43,11 @@ export default function ProjectForm() {
     Object.keys(value).length === 0;
 
   const normalizeLoadedService = (key, value) => {
-    if (["mowing", "mulching", "pruning"].includes(key)) {
+    if (["mowing", "mulching", "pruning", "turfApp"].includes(key)) {
       return Array.isArray(value) ? value : [];
     }
 
-    if (["edging", "bedMaintenance", "leaves"].includes(key)) {
+    if (["edging", "bedMaintenance", "leaves", "flowers", "extras"].includes(key)) {
       return isEmptyObject(value) ? null : value;
     }
 

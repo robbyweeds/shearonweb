@@ -42,10 +42,22 @@ export default function MowingForm() {
   // ---------------------------------------------------------
   // Add new mowing table
   // ---------------------------------------------------------
+  const getNextTableNumber = () =>
+    Math.max(
+      0,
+      ...tables.map((table) => Number(String(table.id).replace("Mowing", "")) || 0)
+    ) + 1;
+
   const addTable = () => {
-    const newId = `Mowing${tables.length + 1}`;
+    const newId = `Mowing${getNextTableNumber()}`;
     const updated = [...tables, { id: newId, data: clone(INITIAL_MOWING_DATA) }];
 
+    updateService("mowing", updated);
+    setTables(updated);
+  };
+
+  const deleteTable = (id) => {
+    const updated = tables.filter((table) => table.id !== id);
     updateService("mowing", updated);
     setTables(updated);
   };
@@ -69,8 +81,12 @@ export default function MowingForm() {
 
       <h3 style={{ marginTop: "2rem" }}>Mowing</h3>
 
-      {tables.map((t) => (
-        <MowingTable key={t.id} tableId={t.id} />
+      {tables.map((t, index) => (
+        <MowingTable
+          key={t.id}
+          tableId={t.id}
+          onDelete={index > 0 ? () => deleteTable(t.id) : null}
+        />
       ))}
 
       <div className="service-tool-row">

@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import LabeledInput from "./LabeledInput";
 import { useServiceContext } from "../context/ServiceContext";
+import { formatCurrency } from "../utils/formatters";
 
 const INITIAL = {
   qtyUnit: { EDGER: 0, BLOWER: 0 },
@@ -142,22 +143,22 @@ export default function EdgingTable() {
         {/* UNIT PRICE */}
         <tr>
           <td>UNIT $</td>
-          <td>${data.unitPrice.EDGER.toFixed(2)}</td>
-          <td>${data.unitPrice.BLOWER.toFixed(2)}</td>
+          <td>{formatCurrency(data.unitPrice.EDGER)}</td>
+          <td>{formatCurrency(data.unitPrice.BLOWER)}</td>
 
           <td>$/OCC</td>
-          <td style={{ background: "#eef" }}>{totalOccDollar.toFixed(2)}</td>
+          <td style={{ background: "#eef" }}>{formatCurrency(totalOccDollar)}</td>
         </tr>
 
         {/* TOTAL */}
         <tr style={{ background: "#f4f4f4", fontWeight: "bold" }}>
           <td>TOTAL</td>
-          <td>${totalRow.EDGER.toFixed(2)}</td>
-          <td>${totalRow.BLOWER.toFixed(2)}</td>
+          <td>{formatCurrency(totalRow.EDGER)}</td>
+          <td>{formatCurrency(totalRow.BLOWER)}</td>
 
           <td>TOTAL $</td>
           <td style={{ background: "#f4f4f4" }}>
-            {finalTotal.toFixed(2)}
+            {formatCurrency(finalTotal)}
           </td>
         </tr>
       </tbody>

@@ -1,140 +1,180 @@
 // myapp/client/src/components/Mulching/mulchingDefaults.js
 
-// --------------------------------------
-// INITIAL TABLE STATE
-// --------------------------------------
-export const INITIAL_MULCHING_DATA = {
-  summary: {},
+export const MULCH_SECTION_KEYS = ["common", "homes", "trees", "finn"];
+export const MULCH_AREA_KEYS = ["area1", "area2", "area3"];
 
-  handCommonAreas: {
-    area1: {
-      sqft: "",
-      efficiency: "Average",
-      depth: '2"',
-      proximity: "Close",
-      hoursOverride: null,
-      mulchOverride: null,
-    },
-    area2: {
-      sqft: "",
-      efficiency: "Average",
-      depth: '2"',
-      proximity: "Close",
-      hoursOverride: null,
-      mulchOverride: null,
-    },
-    area3: {
-      sqft: "",
-      efficiency: "Average",
-      depth: '2"',
-      proximity: "Close",
-      hoursOverride: null,
-      mulchOverride: null,
-    },
-  },
-
-  handHomes: {
-    home1: {
-      sqftEach: "",
-      count: "",
-      efficiency: "Average",
-      depth: '2"',
-      proximity: "Close",
-      hoursOverride: null,
-      mulchOverride: null,
-    },
-    home2: {
-      sqftEach: "",
-      count: "",
-      efficiency: "Average",
-      depth: '2"',
-      proximity: "Close",
-      hoursOverride: null,
-      mulchOverride: null,
-    },
-    home3: {
-      sqftEach: "",
-      count: "",
-      efficiency: "Average",
-      depth: '2"',
-      proximity: "Close",
-      hoursOverride: null,
-      mulchOverride: null,
-    },
-  },
-
-  smPwrCommon: {
-    selection: "Average",
-    hoursOverride: null,
-  },
-
-  loaderCommon: {
-    selection: "Average",
-    hoursOverride: null,
-  },
-
-  smPwrHomes: {
-    selection: "Average",
-    hoursOverride: null,
-  },
-
-  loaderHomes: {
-    selection: "Average",
-    hoursOverride: null,
-  },
-};
-
-// --------------------------------------
-// DEFAULT RATES — PERFECT MATCH TO EXCEL
-// --------------------------------------
 export const DEFAULT_MULCHING_RATES = {
-
-  // Hand application efficiency (yards per man-hour)
-  handEfficiency: {
-    Slowest: 0.9,
-    Slow: 1.1,
-    Average: 1.4,
-    Fast: 1.6,
-    Fastest: 1.8,
+  dollars: {
+    MISC: 52,
+    HAND: 52,
+    FINN: 97,
+    SM_PWR: 57,
+    HELPER: 52,
+    LOADER: 88,
+    MULCH: 31.22,
   },
-
-  // Proximity multipliers
+  handEfficiency: {
+    Slowest: 1.05,
+    Slow: 1.15,
+    Average: 1.25,
+    Fast: 1.35,
+    Fastest: 1.45,
+  },
+  treeRingSize: {
+    "Dia - 3'": 3,
+    "Dia - 4'": 4,
+    "Dia - 5'": 5,
+    "Dia - 6'": 6,
+  },
+  treeEfficiency: {
+    Slowest: 0.4,
+    Slow: 0.5,
+    Average: 0.55,
+    Fast: 0.6,
+    Fastest: 0.7,
+  },
+  treeDepth: {
+    Feather: 0.5,
+    '1"': 1,
+    '1.5"': 1.5,
+    '2"': 2,
+  },
+  depthInches: {
+    Feather: 0.5,
+    '1"': 1,
+    '1.5"': 1.5,
+    '2"': 2,
+  },
+  smPowerManHours: {
+    Minimum: 22,
+    Less: 20,
+    Average: 18,
+    More: 16,
+    Copious: 14,
+  },
+  loaderManHours: {
+    0: 20,
+    0.5: 18,
+    1: 16,
+    2: 14,
+    3: 12,
+    4: 12,
+    5: 12,
+    6: 12,
+    7: 12,
+    8: 12,
+    9: 12,
+  },
   proximity: {
-    Close: 1.0,
+    Close: 1,
     Nearby: 1.1,
     Moderate: 1.2,
     Far: 1.3,
     Farthest: 1.4,
   },
-
-  // Depth of mulch in inches
-  depthInches: {
-    Feather: 0.5,
+  finnEfficiency: {
+    "Finn Slowest": 4,
+    "Finn Slow": 4.5,
+    "Finn Avg": 5,
+    "Finn Fast": 5.5,
+    "Finn Fastest": 6,
+  },
+  finnDepth: {
+    '0.5"': 0.5,
+    '0.75"': 0.75,
     '1"': 1,
+    '1.5"': 1.5,
     '2"': 2,
   },
-
-  // Sm Pwr production (man-hours per yard)
-  smPowerManHours: {
-    Minimum: 16,
-    Less: 14,
-    Average: 12,
-    More: 10,
-    Copious: 8,
+  finnHelper: {
+    Little: 0.75,
+    Less: 0.9,
+    Average: 1,
+    "More Help": 1.1,
+    Copious: 1.25,
   },
+};
 
-  // Loader production (man-hours per yard)
-  loaderManHours: {
-    Minimum: 20,
-    Less: 18,
-    Average: 16,
-    More: 14,
-    Copious: 12,
+const emptyArea = {
+  sqft: 0,
+  efficiency: "Average",
+  coverage: 100,
+  depth: '1"',
+  proximity: "Close",
+};
+
+const emptyHome = {
+  sqftEach: 0,
+  count: 1,
+  efficiency: "Average",
+  coverage: 100,
+  depth: '1"',
+  proximity: "Close",
+};
+
+const emptyTree = {
+  qty: 0,
+  diameter: "Dia - 4'",
+  depth: '1"',
+  efficiency: "Average",
+};
+
+const emptyFinn = {
+  sqft: 0,
+  efficiency: "Finn Avg",
+  coverage: 100,
+  depth: '1"',
+  proximity: "Close",
+};
+
+export const INITIAL_MULCHING_DATA = {
+  name: "Mulch",
+  occurrences: 0,
+  sections: {
+    common: {
+      title: "Hand - Common Areas - Sq/ft",
+      miscHours: 0,
+      smPwr: "Average",
+      loaderHours: 0,
+      areas: {
+        area1: { ...emptyArea },
+        area2: { ...emptyArea },
+        area3: { ...emptyArea },
+      },
+    },
+    homes: {
+      title: "Hand - Homes - # of Homes",
+      miscHours: 0,
+      smPwr: "Average",
+      loaderHours: 0,
+      areas: {
+        area1: { ...emptyHome },
+        area2: { ...emptyHome },
+        area3: { ...emptyHome },
+      },
+    },
+    trees: {
+      title: "Trees - # of Trees",
+      miscHours: 0,
+      smPwr: "Average",
+      loaderHours: 0,
+      areas: {
+        area1: { ...emptyTree },
+        area2: { ...emptyTree },
+        area3: { ...emptyTree },
+      },
+    },
+    finn: {
+      title: "Finn - Sq/ft",
+      miscHours: 0,
+      helper: "Average",
+      loaderHours: 0,
+      areas: {
+        area1: { ...emptyFinn },
+        area2: { ...emptyFinn },
+        area3: { ...emptyFinn },
+      },
+    },
   },
-
-  // Pricing defaults
-  mulchPricePerYard: 28,
-  handLaborRatePerHour: 50,
-  smPwrRatePerHour: 55,
-  loaderRatePerHour: 85,
+  totals: {},
 };

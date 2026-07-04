@@ -33,10 +33,22 @@ export default function MulchingForm() {
     }
   }, [getAllServices, updateService]);
 
+  const getNextTableNumber = () =>
+    Math.max(
+      0,
+      ...tables.map((table) => Number(String(table.id).replace("Mulch", "")) || 0)
+    ) + 1;
+
   const addTable = () => {
-    const newId = `Mulch${tables.length + 1}`;
+    const newId = `Mulch${getNextTableNumber()}`;
     const updated = [...tables, { id: newId, data: clone(INITIAL_MULCHING_DATA) }];
 
+    updateService("mulching", updated);
+    setTables(updated);
+  };
+
+  const deleteTable = (id) => {
+    const updated = tables.filter((table) => table.id !== id);
     updateService("mulching", updated);
     setTables(updated);
   };
@@ -55,8 +67,12 @@ export default function MulchingForm() {
     <div className="service-entry-page">
       <h2>Mulching</h2>
 
-      {tables.map((t) => (
-        <MulchingPage key={t.id} tableId={t.id} />
+      {tables.map((t, index) => (
+        <MulchingPage
+          key={t.id}
+          tableId={t.id}
+          onDelete={index > 0 ? () => deleteTable(t.id) : null}
+        />
       ))}
 
       <div className="service-tool-row">

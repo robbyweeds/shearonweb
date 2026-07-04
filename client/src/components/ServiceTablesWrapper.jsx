@@ -48,13 +48,13 @@ export default function ServiceTablesWrapper() {
     >
       {/* --- Edging --- */}
       <div style={{ flex: 1, minWidth: "350px" }}>
-        <h3>🔪 Edging Estimate</h3>
+        <h3>Edging Estimate</h3>
         <EdgingTable tableId="EDGING1" />
       </div>
 
       {/* --- Bed Maintenance --- */}
       <div style={{ flex: 1, minWidth: "350px" }}>
-        <h3>🌱 Bed Maintenance Estimate</h3>
+        <h3>Bed Maintenance Estimate</h3>
         <BedMaintenanceTable tableId="BED1" />
       </div>
     </div>

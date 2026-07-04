@@ -3,6 +3,7 @@
 // =====================================
 
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { DEFAULT_TURF_APP_RATES } from "../components/TurfApp/turfAppDefaults";
 
 const ServiceContext = createContext(null);
 
@@ -92,6 +93,9 @@ export function ServiceProvider({ children }) {
     mulching: null,
     pruning: [],     // ✅ FIXED (must be an array)
     leaves: null,
+    turfApp: [],
+    flowers: null,
+    extras: null,
   });
 
   // ----------------------------------------
@@ -102,6 +106,7 @@ export function ServiceProvider({ children }) {
     mowingDollars: DEFAULT_MOWING_DOLLARS,
     mulchingRates: null,
     pruningRates: null,   // ✅ ADDED (supports PruningRatesPage)
+    turfAppRates: DEFAULT_TURF_APP_RATES,
   });
 
   // ----------------------------------------
@@ -137,6 +142,9 @@ export function ServiceProvider({ children }) {
       mulching: null,
       pruning: [],   // ✅ FIXED (was null — must stay an array)
       leaves: null,
+      turfApp: [],
+      flowers: null,
+      extras: null,
     });
   }, []);
 
@@ -146,6 +154,7 @@ export function ServiceProvider({ children }) {
       mowingDollars: DEFAULT_MOWING_DOLLARS,
       mulchingRates: null,
       pruningRates: null,
+      turfAppRates: DEFAULT_TURF_APP_RATES,
     });
   }, []);
 

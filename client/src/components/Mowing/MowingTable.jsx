@@ -15,8 +15,9 @@ import {
 
 import { computeHours, computeTotals } from "./mowingCalculations";
 import { saveMowing } from "./mowingSave";
+import { formatCurrency } from "../../utils/formatters";
 
-export default function MowingTable({ tableId }) {
+export default function MowingTable({ tableId, onDelete }) {
   const { currentServices, updateService, currentRates } = useServiceContext();
 
   const mowingDollars = currentRates?.mowingDollars || {};
@@ -202,12 +203,19 @@ export default function MowingTable({ tableId }) {
       >
         <div>
           <label style={{ fontWeight: "bold" }}>Mowing Area</label>
-          <input
-            type="text"
-            value={data.name}
-            onChange={handleNameChange}
-            style={{ width: "100%", padding: "6px" }}
-          />
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <input
+              type="text"
+              value={data.name}
+              onChange={handleNameChange}
+              style={{ width: "100%", padding: "6px" }}
+            />
+            {onDelete && (
+              <button className="danger-button compact-button" onClick={onDelete} type="button">
+                Delete
+              </button>
+            )}
+          </div>
         </div>
 
         <div>
@@ -335,7 +343,7 @@ export default function MowingTable({ tableId }) {
             <td style={{ ...cellStyle, background: "#ccc" }}></td>
             <td style={{ ...cellStyle, background: "#ccc" }}></td>
             <td style={summaryLabelStyle}>$/Occ:</td>
-            <td style={summaryValueStyle}>${totals.totalOcc.toFixed(2)}</td>
+            <td style={summaryValueStyle}>{formatCurrency(totals.totalOcc)}</td>
           </tr>
 
           <tr>
@@ -411,38 +419,38 @@ export default function MowingTable({ tableId }) {
 
           <tr>
             <td style={cellStyle}>UNIT $</td>
-            <td style={cellStyle}>${(mowingDollars.MISC_HRS || 0).toFixed(2)}</td>
+            <td style={cellStyle}>{formatCurrency(mowingDollars.MISC_HRS)}</td>
 
             {DECK_KEYS.map((key) => (
               <td key={key} style={cellStyle}>
-                ${(mowingDollars[key] || 0).toFixed(2)}
+                {formatCurrency(mowingDollars[key])}
               </td>
             ))}
 
-            <td style={cellStyle}>${(mowingDollars.TRIMMER || 0).toFixed(2)}</td>
-            <td style={cellStyle}>${(mowingDollars.BLOWER || 0).toFixed(2)}</td>
-            <td style={cellStyle}>${(mowingDollars.ROTARY || 0).toFixed(2)}</td>
-            <td style={cellStyle}>${(mowingDollars[SPECIALTY_KEY] || 0).toFixed(2)}</td>
+            <td style={cellStyle}>{formatCurrency(mowingDollars.TRIMMER)}</td>
+            <td style={cellStyle}>{formatCurrency(mowingDollars.BLOWER)}</td>
+            <td style={cellStyle}>{formatCurrency(mowingDollars.ROTARY)}</td>
+            <td style={cellStyle}>{formatCurrency(mowingDollars[SPECIALTY_KEY])}</td>
 
             <td style={summaryLabelStyle}>ADJ $/Occ:</td>
-            <td style={summaryValueStyle}>${adjustedOcc.toFixed(2)}</td>
+            <td style={summaryValueStyle}>{formatCurrency(adjustedOcc)}</td>
           </tr>
 
           <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
             <td style={cellStyle}>TOTAL</td>
 
-            <td style={cellStyle}>${(totals.rowTotals.MISC_HRS || 0).toFixed(2)}</td>
+            <td style={cellStyle}>{formatCurrency(totals.rowTotals.MISC_HRS)}</td>
 
             {DECK_KEYS.map((key) => (
               <td key={key} style={cellStyle}>
-                ${(totals.rowTotals[key] || 0).toFixed(2)}
+                {formatCurrency(totals.rowTotals[key])}
               </td>
             ))}
 
-            <td style={cellStyle}>${(totals.rowTotals.TRIMMER || 0).toFixed(2)}</td>
-            <td style={cellStyle}>${(totals.rowTotals.BLOWER || 0).toFixed(2)}</td>
-            <td style={cellStyle}>${(totals.rowTotals.ROTARY || 0).toFixed(2)}</td>
-            <td style={cellStyle}>${(totals.rowTotals[SPECIALTY_KEY] || 0).toFixed(2)}</td>
+            <td style={cellStyle}>{formatCurrency(totals.rowTotals.TRIMMER)}</td>
+            <td style={cellStyle}>{formatCurrency(totals.rowTotals.BLOWER)}</td>
+            <td style={cellStyle}>{formatCurrency(totals.rowTotals.ROTARY)}</td>
+            <td style={cellStyle}>{formatCurrency(totals.rowTotals[SPECIALTY_KEY])}</td>
 
             <td style={summaryLabelStyle}># OCC:</td>
             <td style={{ ...summaryValueStyle, background: "yellow" }}>
@@ -459,7 +467,7 @@ export default function MowingTable({ tableId }) {
           <tr>
             <td colSpan={12} style={{ border: "none" }}></td>
             <td style={summaryLabelStyle}>TOTAL $:</td>
-            <td style={summaryValueStyle}>${totals.final.toFixed(2)}</td>
+            <td style={summaryValueStyle}>{formatCurrency(totals.final)}</td>
           </tr>
 
           <tr>
@@ -472,7 +480,7 @@ export default function MowingTable({ tableId }) {
             <td colSpan={12} style={{ border: "none" }}></td>
             <td style={summaryLabelStyle}>Price / A:</td>
             <td style={summaryValueStyle}>
-              {totals.totalAcres > 0 ? `$${pricePerAcre.toFixed(2)}` : "#DIV/0!"}
+              {totals.totalAcres > 0 ? formatCurrency(pricePerAcre) : "#DIV/0!"}
             </td>
           </tr>
         </tbody>

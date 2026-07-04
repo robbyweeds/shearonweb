@@ -27,8 +27,14 @@ export default function SpringForm() {
     }
   }, [currentServices.springServices, updateService]);
 
+  const getNextTableNumber = () =>
+    Math.max(
+      0,
+      ...tables.map((table) => Number(String(table.id).replace("Spring", "")) || 0)
+    ) + 1;
+
   const addTable = () => {
-    const newId = `Spring${tables.length + 1}`;
+    const newId = `Spring${getNextTableNumber()}`;
     const updated = [...tables, { id: newId, data: {} }];
     updateService("springServices", updated);
     setTables(updated);
@@ -44,22 +50,12 @@ export default function SpringForm() {
     <div style={{ padding: "1rem" }}>
       <h2>Spring Services</h2>
 
-      {tables.map((t) => (
+      {tables.map((t, index) => (
         <div key={t.id} style={{ border: "1px solid #ccc", padding: "6px" }}>
-          <SpringTable tableId={t.id} />
-
-          <button
-            onClick={() => deleteTable(t.id)}
-            style={{
-              background: "#dc3545",
-              color: "white",
-              padding: "4px 8px",
-              borderRadius: "4px",
-              marginTop: "4px",
-            }}
-          >
-            Delete
-          </button>
+          <SpringTable
+            tableId={t.id}
+            onDelete={index > 0 ? () => deleteTable(t.id) : null}
+          />
         </div>
       ))}
 

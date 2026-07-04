@@ -4,9 +4,14 @@ import { useServiceContext } from "../context/ServiceContext";
 
 import { INITIAL_MOWING_DATA } from "./Mowing/mowingDefaults";
 import { computeHours, computeTotals } from "./Mowing/mowingCalculations";
+import { computeMulchingTotals } from "./Mulching/mulchingCalculations";
+import { DEFAULT_MULCHING_RATES } from "./Mulching/mulchingDefaults";
+import { computeTurfAppTotals } from "./TurfApp/turfAppCalculations";
+import { DEFAULT_TURF_APP_RATES, INITIAL_TURF_APP_DATA } from "./TurfApp/turfAppDefaults";
+import { formatCurrency } from "../utils/formatters";
 
 const API_URL = process.env.REACT_APP_API_URL || "";
-const money = (value) => `$${Number(value || 0).toFixed(2)}`;
+const money = formatCurrency;
 const SAVED_RATES_KEY = "__rates";
 
 export default function ServicesPage() {
@@ -54,6 +59,13 @@ export default function ServicesPage() {
   const deleteEdging = () => updateService("edging", null);
   const deleteBedMaintenance = () => updateService("bedMaintenance", null);
   const deleteLeaves = () => updateService("leaves", null);
+  const deleteTurfApp = (id) =>
+    updateService(
+      "turfApp",
+      (currentServices.turfApp || []).filter((t) => t.id !== id)
+    );
+  const deleteFlowers = () => updateService("flowers", null);
+  const deleteExtras = () => updateService("extras", null);
 
   const acresPerHour = currentRates?.mowingFactors?.acresPerHour || {};
   const mowingDollars = currentRates?.mowingDollars || {};
@@ -172,15 +184,17 @@ export default function ServicesPage() {
 
     mulchingEntries.forEach((entry) => {
       const data = entry.data || {};
-      const occ = Number(data.summary?.numOccurrences || 0);
+      const rates = currentRates?.mulchingRates || DEFAULT_MULCHING_RATES;
+      const calc = computeMulchingTotals(data, rates);
+      const occ = Number(calc.occurrences || 0);
       if (occ <= 0) return;
 
       rows.push({
         id: `mulching-${entry.id}`,
-        label: data.name || "Mulching Area",
+        label: data.name || "Mulch",
         occ,
-        pricePerOcc: 0,
-        total: 0,
+        pricePerOcc: calc.totalOcc,
+        total: calc.totalPrice,
         onDelete: () => deleteMulching(entry.id),
       });
     });
@@ -243,6 +257,65 @@ export default function ServicesPage() {
         pricePerOcc: null,
         total: null,
         onDelete: deleteLeaves,
+      });
+    }
+
+    const turfEntries = Array.isArray(currentServices.turfApp)
+      ? currentServices.turfApp
+      : [];
+    const turfRates = {
+      ...DEFAULT_TURF_APP_RATES,
+      ...(currentRates?.turfAppRates || {}),
+    };
+
+    turfEntries.forEach((entry, index) => {
+      const raw = entry.data || {};
+      const merged = {
+        ...INITIAL_TURF_APP_DATA,
+        ...raw,
+        name: raw.name || `Turf Application #${index + 1}`,
+        qtyUnit: {
+          ...INITIAL_TURF_APP_DATA.qtyUnit,
+          ...(raw.qtyUnit || {}),
+        },
+        summary: {
+          ...INITIAL_TURF_APP_DATA.summary,
+          ...(raw.summary || {}),
+        },
+      };
+      const totals = computeTurfAppTotals(merged, turfRates);
+      const occ = Number(merged.summary?.numOccurrences || 0);
+      if (occ <= 0) return;
+
+      rows.push({
+        id: `turfApp-${entry.id}`,
+        label: merged.name || "Turf App",
+        occ,
+        pricePerOcc: totals.totalOcc,
+        total: totals.final,
+        onDelete: () => deleteTurfApp(entry.id),
+      });
+    });
+
+    if (currentServices.flowers) {
+      rows.push({
+        id: "flowers",
+        label: currentServices.flowers.area || "Flowers",
+        occ: currentServices.flowers.quantity || "Saved",
+        pricePerOcc: null,
+        total: null,
+        onDelete: deleteFlowers,
+      });
+    }
+
+    if (currentServices.extras) {
+      rows.push({
+        id: "extras",
+        label: currentServices.extras.area || "Extras",
+        occ: currentServices.extras.quantity || "Saved",
+        pricePerOcc: null,
+        total: null,
+        onDelete: deleteExtras,
       });
     }
 
@@ -344,6 +417,9 @@ export default function ServicesPage() {
           <button onClick={() => navigate("/services/mulching")} type="button">Mulching</button>
           <button onClick={() => navigate("/services/pruning")} type="button">Pruning</button>
           <button onClick={() => navigate("/services/leaves")} type="button">Leaves</button>
+          <button onClick={() => navigate("/services/turf-app")} type="button">Turf App</button>
+          <button onClick={() => navigate("/services/flowers")} type="button">Flowers</button>
+          <button onClick={() => navigate("/services/extras")} type="button">Extras</button>
         </section>
 
         <section className="summary-panel">

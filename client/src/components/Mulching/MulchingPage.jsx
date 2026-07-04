@@ -2,19 +2,47 @@
 
 import React from "react";
 import { useServiceContext } from "../../context/ServiceContext";
-import { DEFAULT_MULCHING_RATES } from "./mulchingDefaults";
+import { DEFAULT_MULCHING_RATES, MULCH_AREA_KEYS } from "./mulchingDefaults";
 import {
-  mergeMulchingData,
-  computeCommonAreaValues,
-  computeHomeValues,
+  computeMulchingTotals,
   formatCurrency,
+  mergeMulchingData,
+  mergeMulchingRates,
 } from "./mulchingCalculations";
-import MulchingCommonTable from "./MulchingCommonTable";
-import MulchingHomesTable from "./MulchingHomesTable";
 
-export default function MulchingPage({ tableId }) {
-  const { currentServices, updateService, currentRates } =
-    useServiceContext();
+const SECTION_META = {
+  common: {
+    title: "Hand - Common Areas - Sq/ft",
+    itemLabels: ["Area #1", "Area #2", "Area #3"],
+    sqftLabel: "Sq/Ft",
+    equipmentLabel: "SM PWR",
+    areaRateKey: "HAND",
+  },
+  homes: {
+    title: "Hand - Homes - # of Homes",
+    itemLabels: ["Home Size #1", "Home Size #2", "Home Size #3"],
+    sqftLabel: "Sq/Ft per Home",
+    equipmentLabel: "SM PWR",
+    areaRateKey: "HAND",
+  },
+  trees: {
+    title: "Trees - # of Trees",
+    itemLabels: ["Tree Rings", "Tree Rings", "Tree Rings"],
+    sqftLabel: "Qty",
+    equipmentLabel: "SM PWR",
+    areaRateKey: "HAND",
+  },
+  finn: {
+    title: "Finn - Sq/ft",
+    itemLabels: ["Area #1", "Area #2", "Area #3"],
+    sqftLabel: "Sq/Ft",
+    equipmentLabel: "HELPER",
+    areaRateKey: "FINN",
+  },
+};
+
+export default function MulchingPage({ tableId, onDelete }) {
+  const { currentServices, updateService, currentRates } = useServiceContext();
 
   const mulchingArray = Array.isArray(currentServices.mulching)
     ? currentServices.mulching
@@ -23,513 +51,386 @@ export default function MulchingPage({ tableId }) {
   const existingEntry =
     mulchingArray.find((m) => m.id === tableId) || { id: tableId, data: {} };
 
-  const mulchingRates =
-    currentRates?.mulchingRates || DEFAULT_MULCHING_RATES;
-
+  const mulchingRates = mergeMulchingRates(
+    currentRates?.mulchingRates || DEFAULT_MULCHING_RATES
+  );
   const mergedData = mergeMulchingData(existingEntry.data || {});
+  const totals = computeMulchingTotals(mergedData, mulchingRates);
 
   const updateMulchingData = (newData) => {
-    const updatedEntry = { ...existingEntry, data: newData };
-    let updatedArray;
-
-    if (mulchingArray.some((m) => m.id === tableId)) {
-      updatedArray = mulchingArray.map((m) =>
-        m.id === tableId ? updatedEntry : m
-      );
-    } else {
-      updatedArray = [...mulchingArray, updatedEntry];
-    }
+    const nextData = {
+      ...newData,
+      totals: computeMulchingTotals(newData, mulchingRates),
+    };
+    const updatedEntry = { ...existingEntry, data: nextData };
+    const updatedArray = mulchingArray.some((m) => m.id === tableId)
+      ? mulchingArray.map((m) => (m.id === tableId ? updatedEntry : m))
+      : [...mulchingArray, updatedEntry];
 
     updateService("mulching", updatedArray);
   };
 
-  // -------- HANDLERS FOR COMMON AREAS --------
+  const updateRootField = (field, value) => {
+    updateMulchingData({ ...mergedData, [field]: value });
+  };
 
-  const handleCommonFieldChange = (areaKey, field, value) => {
-    const newData = {
+  const updateSectionField = (sectionKey, field, value) => {
+    updateMulchingData({
       ...mergedData,
-      handCommonAreas: {
-        ...mergedData.handCommonAreas,
-        [areaKey]: {
-          ...mergedData.handCommonAreas[areaKey],
+      sections: {
+        ...mergedData.sections,
+        [sectionKey]: {
+          ...mergedData.sections[sectionKey],
           [field]: value,
-          hoursOverride: null,
-          mulchOverride: null,
         },
       },
-      smPwrCommon: {
-        ...mergedData.smPwrCommon,
-        hoursOverride: null,
-      },
-      loaderCommon: {
-        ...mergedData.loaderCommon,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
+    });
   };
 
-  const handleCommonHoursOverrideChange = (areaKey, value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
+  const updateAreaField = (sectionKey, areaKey, field, value) => {
+    updateMulchingData({
       ...mergedData,
-      handCommonAreas: {
-        ...mergedData.handCommonAreas,
-        [areaKey]: {
-          ...mergedData.handCommonAreas[areaKey],
-          hoursOverride: isNaN(num) ? null : num,
+      sections: {
+        ...mergedData.sections,
+        [sectionKey]: {
+          ...mergedData.sections[sectionKey],
+          areas: {
+            ...mergedData.sections[sectionKey].areas,
+            [areaKey]: {
+              ...mergedData.sections[sectionKey].areas[areaKey],
+              [field]: value,
+            },
+          },
         },
       },
-    };
-    updateMulchingData(newData);
+    });
   };
 
-  const handleCommonMulchOverrideChange = (areaKey, value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      handCommonAreas: {
-        ...mergedData.handCommonAreas,
-        [areaKey]: {
-          ...mergedData.handCommonAreas[areaKey],
-          mulchOverride: isNaN(num) ? null : num,
-        },
-      },
-      smPwrCommon: {
-        ...mergedData.smPwrCommon,
-        hoursOverride: null,
-      },
-      loaderCommon: {
-        ...mergedData.loaderCommon,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  // -------- HANDLERS FOR HOMES --------
-
-  const handleHomeFieldChange = (homeKey, field, value) => {
-    const newData = {
-      ...mergedData,
-      handHomes: {
-        ...mergedData.handHomes,
-        [homeKey]: {
-          ...mergedData.handHomes[homeKey],
-          [field]: value,
-          hoursOverride: null,
-          mulchOverride: null,
-        },
-      },
-      smPwrHomes: {
-        ...mergedData.smPwrHomes,
-        hoursOverride: null,
-      },
-      loaderHomes: {
-        ...mergedData.loaderHomes,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleHomeHoursOverrideChange = (homeKey, value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      handHomes: {
-        ...mergedData.handHomes,
-        [homeKey]: {
-          ...mergedData.handHomes[homeKey],
-          hoursOverride: isNaN(num) ? null : num,
-        },
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleHomeMulchOverrideChange = (homeKey, value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      handHomes: {
-        ...mergedData.handHomes,
-        [homeKey]: {
-          ...mergedData.handHomes[homeKey],
-          mulchOverride: isNaN(num) ? null : num,
-        },
-      },
-      smPwrHomes: {
-        ...mergedData.smPwrHomes,
-        hoursOverride: null,
-      },
-      loaderHomes: {
-        ...mergedData.loaderHomes,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  // -------- COMPUTE TOTALS FOR COMMON & HOMES --------
-
-  const commonAreaKeys = ["area1", "area2", "area3"];
-  const homeKeys = ["home1", "home2", "home3"];
-
-  let totalCommonHours = 0;
-  let totalCommonMulch = 0;
-
-  commonAreaKeys.forEach((k) => {
-    const area = mergedData.handCommonAreas[k];
-    const computed = computeCommonAreaValues(area, mulchingRates);
-    const displayHours =
-      area.hoursOverride != null ? area.hoursOverride : computed.hours;
-    const displayMulch =
-      area.mulchOverride != null ? area.mulchOverride : computed.mulch;
-
-    totalCommonHours += displayHours || 0;
-    totalCommonMulch += displayMulch || 0;
-  });
-
-  let totalHomesHours = 0;
-  let totalHomesMulch = 0;
-
-  homeKeys.forEach((k) => {
-    const home = mergedData.handHomes[k];
-    const computed = computeHomeValues(home, mulchingRates);
-    const displayHours =
-      home.hoursOverride != null ? home.hoursOverride : computed.hours;
-    const displayMulch =
-      home.mulchOverride != null ? home.mulchOverride : computed.mulch;
-
-    totalHomesHours += displayHours || 0;
-    totalHomesMulch += displayMulch || 0;
-  });
-
-  // -------- SM PWR & LOADER (COMMON) --------
-
-  const smPwrRates = mulchingRates.smPowerManHours || {};
-  const loaderRates = mulchingRates.loaderManHours || {};
-
-  const smPwrCommonSelection = mergedData.smPwrCommon.selection || "Average";
-  const loaderCommonSelection = mergedData.loaderCommon.selection || "Average";
-
-  const smPwrCommonRate = smPwrRates[smPwrCommonSelection] || 0;
-  const loaderCommonRate = loaderRates[loaderCommonSelection] || 0;
-
-  const computedSmPwrCommonHours =
-    smPwrCommonRate > 0 && totalCommonMulch > 0
-      ? totalCommonMulch / smPwrCommonRate
-      : 0;
-
-  const computedLoaderCommonHours =
-    loaderCommonRate > 0 && totalCommonMulch > 0
-      ? totalCommonMulch / loaderCommonRate
-      : 0;
-
-  const smPwrCommonDisplay =
-    mergedData.smPwrCommon.hoursOverride != null
-      ? mergedData.smPwrCommon.hoursOverride
-      : computedSmPwrCommonHours;
-
-  const loaderCommonDisplay =
-    mergedData.loaderCommon.hoursOverride != null
-      ? mergedData.loaderCommon.hoursOverride
-      : computedLoaderCommonHours;
-
-  const handleSmPwrCommonSelectionChange = (value) => {
-    const newData = {
-      ...mergedData,
-      smPwrCommon: {
-        ...mergedData.smPwrCommon,
-        selection: value,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleSmPwrCommonOverrideChange = (value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      smPwrCommon: {
-        ...mergedData.smPwrCommon,
-        hoursOverride: isNaN(num) ? null : num,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleLoaderCommonSelectionChange = (value) => {
-    const newData = {
-      ...mergedData,
-      loaderCommon: {
-        ...mergedData.loaderCommon,
-        selection: value,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleLoaderCommonOverrideChange = (value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      loaderCommon: {
-        ...mergedData.loaderCommon,
-        hoursOverride: isNaN(num) ? null : num,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  // -------- SM PWR & LOADER (HOMES) --------
-
-  const smPwrHomesSelection = mergedData.smPwrHomes.selection || "Average";
-  const loaderHomesSelection = mergedData.loaderHomes.selection || "Average";
-
-  const smPwrHomesRate = smPwrRates[smPwrHomesSelection] || 0;
-  const loaderHomesRate = loaderRates[loaderHomesSelection] || 0;
-
-  const computedSmPwrHomesHours =
-    smPwrHomesRate > 0 && totalHomesMulch > 0
-      ? totalHomesMulch / smPwrHomesRate
-      : 0;
-
-  const computedLoaderHomesHours =
-    loaderHomesRate > 0 && totalHomesMulch > 0
-      ? totalHomesMulch / loaderHomesRate
-      : 0;
-
-  const smPwrHomesDisplay =
-    mergedData.smPwrHomes.hoursOverride != null
-      ? mergedData.smPwrHomes.hoursOverride
-      : computedSmPwrHomesHours;
-
-  const loaderHomesDisplay =
-    mergedData.loaderHomes.hoursOverride != null
-      ? mergedData.loaderHomes.hoursOverride
-      : computedLoaderHomesHours;
-
-  const handleSmPwrHomesSelectionChange = (value) => {
-    const newData = {
-      ...mergedData,
-      smPwrHomes: {
-        ...mergedData.smPwrHomes,
-        selection: value,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleSmPwrHomesOverrideChange = (value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      smPwrHomes: {
-        ...mergedData.smPwrHomes,
-        hoursOverride: isNaN(num) ? null : num,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleLoaderHomesSelectionChange = (value) => {
-    const newData = {
-      ...mergedData,
-      loaderHomes: {
-        ...mergedData.loaderHomes,
-        selection: value,
-        hoursOverride: null,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  const handleLoaderHomesOverrideChange = (value) => {
-    const num = value === "" ? null : Number(value);
-    const newData = {
-      ...mergedData,
-      loaderHomes: {
-        ...mergedData.loaderHomes,
-        hoursOverride: isNaN(num) ? null : num,
-      },
-    };
-    updateMulchingData(newData);
-  };
-
-  // -------- PRICING CALCULATIONS --------
-
-  const handRate = mulchingRates.handLaborRatePerHour ?? 50;
-  const smPwrRate = mulchingRates.smPwrRatePerHour ?? 55;
-  const loaderRate = mulchingRates.loaderRatePerHour ?? 85;
-  const mulchPrice = mulchingRates.mulchPricePerYard ?? 28;
-
-  const commonHandHours = totalCommonHours;
-  const commonSmPwrHours = smPwrCommonDisplay || 0;
-  const commonLoaderHours = loaderCommonDisplay || 0;
-  const commonMulchYards = totalCommonMulch;
-
-  const homesHandHours = totalHomesHours;
-  const homesSmPwrHours = smPwrHomesDisplay || 0;
-  const homesLoaderHours = loaderHomesDisplay || 0;
-  const homesMulchYards = totalHomesMulch;
-
-  const commonPrice =
-    commonHandHours * handRate +
-    commonSmPwrHours * smPwrRate +
-    commonLoaderHours * loaderRate +
-    commonMulchYards * mulchPrice;
-
-  const homesPrice =
-    homesHandHours * handRate +
-    homesSmPwrHours * smPwrRate +
-    homesLoaderHours * loaderRate +
-    homesMulchYards * mulchPrice;
-
-  const totalPrice = commonPrice + homesPrice;
-
-  // -------- LIVE PREVIEW TOTALS --------
-
-  const totalSmPwrHours = (smPwrCommonDisplay || 0) + (smPwrHomesDisplay || 0);
-  const totalLoaderHours =
-    (loaderCommonDisplay || 0) + (loaderHomesDisplay || 0);
-
-  const totalAreaHours = totalCommonHours + totalHomesHours;
-  const totalHours = totalAreaHours + totalSmPwrHours + totalLoaderHours;
-  const totalMulchYards = totalCommonMulch + totalHomesMulch;
-
-  // -------- STYLES --------
-
-  const tableStyle = {
-    width: "100%",
-    borderCollapse: "collapse",
-    marginTop: "0.25rem",
-    fontSize: "0.85rem",
-  };
-
-  const thStyle = {
-    borderBottom: "1px solid #ccc",
-    padding: "3px",
-    textAlign: "left",
+  const cellStyle = {
+    padding: "4px",
+    fontSize: "12px",
+    textAlign: "center",
     whiteSpace: "nowrap",
   };
-
-  const tdStyle = {
-    borderBottom: "1px solid #eee",
-    padding: "3px",
-    verticalAlign: "top",
-  };
-
+  const editableBackground = "#fff59d";
   const inputStyle = {
+    width: "86px",
+    fontSize: "12px",
+    padding: "2px",
+    background: editableBackground,
+  };
+  const selectStyle = {
     width: "100%",
-    padding: "2px 3px",
-    fontSize: "0.8rem",
-    boxSizing: "border-box",
+    fontSize: "12px",
+    padding: "2px",
+    background: editableBackground,
+  };
+  const summaryLabelStyle = { ...cellStyle, fontWeight: "bold", textAlign: "right", background: "#f3f3f3" };
+  const summaryValueStyle = { ...cellStyle, fontWeight: "bold", background: "#eef" };
+
+  const numberInput = (value, onChange, step = "0.1") => (
+    <input
+      type="number"
+      value={value}
+      min="0"
+      step={step}
+      onChange={(e) => onChange(Number(e.target.value) || 0)}
+      style={inputStyle}
+    />
+  );
+
+  const formatInputNumber = (value) => {
+    const num = Number(value || 0);
+    return Number.isFinite(num) ? num.toLocaleString("en-US") : "0";
   };
 
-  // -------- RENDER --------
+  const parseFormattedNumber = (value) => Number(String(value).replace(/,/g, "")) || 0;
+
+  const squareFootInput = (value, onChange) => (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={formatInputNumber(value)}
+      onChange={(e) => onChange(parseFormattedNumber(e.target.value))}
+      style={inputStyle}
+    />
+  );
+
+  const renderAreaInputRow = (sectionKey) => {
+    const section = mergedData.sections[sectionKey];
+    const meta = SECTION_META[sectionKey];
+
+    if (sectionKey === "homes") {
+      return (
+        <>
+          <tr>
+            <td style={cellStyle}>{meta.sqftLabel}</td>
+            <td style={cellStyle}></td>
+            {MULCH_AREA_KEYS.map((areaKey) => (
+              <td key={areaKey} style={cellStyle}>
+                {squareFootInput(section.areas[areaKey].sqftEach, (value) => updateAreaField(sectionKey, areaKey, "sqftEach", value))}
+              </td>
+            ))}
+            <td style={cellStyle}>
+              <select value={section.smPwr} onChange={(e) => updateSectionField(sectionKey, "smPwr", e.target.value)} style={selectStyle}>
+                {Object.keys(mulchingRates.smPowerManHours).map((key) => <option key={key}>{key}</option>)}
+              </select>
+            </td>
+            <td style={cellStyle}>{numberInput(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value), "0.1")}</td>
+            <td style={cellStyle}></td>
+            <td style={summaryLabelStyle}>Price per Yard</td>
+            <td style={summaryValueStyle}>{totals.sections[sectionKey].pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.sections[sectionKey].pricePerYard)}</td>
+          </tr>
+          <tr>
+            <td style={cellStyle}>Number of Homes</td>
+            <td style={cellStyle}></td>
+            {MULCH_AREA_KEYS.map((areaKey) => (
+              <td key={areaKey} style={cellStyle}>
+                Home#: {numberInput(section.areas[areaKey].count, (value) => updateAreaField(sectionKey, areaKey, "count", value), "1")}
+              </td>
+            ))}
+            <td colSpan={5} style={cellStyle}></td>
+          </tr>
+        </>
+      );
+    }
+
+    if (sectionKey === "trees") {
+      return (
+        <>
+          <tr>
+            <td style={cellStyle}></td>
+            <td style={cellStyle}></td>
+            {MULCH_AREA_KEYS.map((areaKey) => (
+              <td key={areaKey} style={cellStyle}>
+                Qty: {numberInput(section.areas[areaKey].qty, (value) => updateAreaField(sectionKey, areaKey, "qty", value), "1")}
+              </td>
+            ))}
+            <td style={cellStyle}>
+              <select value={section.smPwr} onChange={(e) => updateSectionField(sectionKey, "smPwr", e.target.value)} style={selectStyle}>
+                {Object.keys(mulchingRates.smPowerManHours).map((key) => <option key={key}>{key}</option>)}
+              </select>
+            </td>
+            <td style={cellStyle}>{numberInput(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value), "0.1")}</td>
+            <td style={cellStyle}></td>
+            <td style={summaryLabelStyle}>Price per Yard</td>
+            <td style={summaryValueStyle}>{totals.sections[sectionKey].pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.sections[sectionKey].pricePerYard)}</td>
+          </tr>
+          <tr>
+            <td style={cellStyle}>Tree Ring Diameter</td>
+            <td style={cellStyle}></td>
+            {MULCH_AREA_KEYS.map((areaKey) => (
+              <td key={areaKey} style={cellStyle}>
+                <select value={section.areas[areaKey].diameter} onChange={(e) => updateAreaField(sectionKey, areaKey, "diameter", e.target.value)} style={selectStyle}>
+                  {Object.keys(mulchingRates.treeRingSize).map((key) => <option key={key}>{key}</option>)}
+                </select>
+              </td>
+            ))}
+            <td colSpan={5} style={cellStyle}></td>
+          </tr>
+        </>
+      );
+    }
+
+    return (
+      <tr>
+        <td style={cellStyle}>{meta.sqftLabel}</td>
+        <td style={cellStyle}></td>
+        {MULCH_AREA_KEYS.map((areaKey) => (
+          <td key={areaKey} style={cellStyle}>
+            {squareFootInput(section.areas[areaKey].sqft, (value) => updateAreaField(sectionKey, areaKey, "sqft", value))}
+          </td>
+        ))}
+        <td style={cellStyle}>
+          {sectionKey === "finn" ? "" : (
+            <select value={section.smPwr} onChange={(e) => updateSectionField(sectionKey, "smPwr", e.target.value)} style={selectStyle}>
+              {Object.keys(mulchingRates.smPowerManHours).map((key) => <option key={key}>{key}</option>)}
+            </select>
+          )}
+        </td>
+        <td style={cellStyle}>{numberInput(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value), "0.1")}</td>
+        <td style={cellStyle}></td>
+        <td style={summaryLabelStyle}>Price per Yard</td>
+        <td style={summaryValueStyle}>{totals.sections[sectionKey].pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.sections[sectionKey].pricePerYard)}</td>
+      </tr>
+    );
+  };
+
+  const renderEfficiencyRow = (sectionKey) => {
+    const section = mergedData.sections[sectionKey];
+    if (sectionKey === "trees") return null;
+    const options = sectionKey === "finn" ? Object.keys(mulchingRates.finnEfficiency) : Object.keys(mulchingRates.handEfficiency);
+
+    return (
+      <tr>
+        <td style={cellStyle}>EFFICIENCY</td>
+        <td style={cellStyle}></td>
+        {MULCH_AREA_KEYS.map((areaKey) => (
+          <td key={areaKey} style={cellStyle}>
+            <select value={section.areas[areaKey].efficiency} onChange={(e) => updateAreaField(sectionKey, areaKey, "efficiency", e.target.value)} style={selectStyle}>
+              {options.map((key) => <option key={key}>{key}</option>)}
+            </select>
+          </td>
+        ))}
+        <td style={cellStyle}>
+          {sectionKey === "finn" && (
+            <select value={section.helper} onChange={(e) => updateSectionField(sectionKey, "helper", e.target.value)} style={selectStyle}>
+              {Object.keys(mulchingRates.finnHelper).map((key) => <option key={key}>{key}</option>)}
+            </select>
+          )}
+        </td>
+        <td colSpan={4} style={cellStyle}></td>
+      </tr>
+    );
+  };
+
+  const renderCoverageRow = (sectionKey) => {
+    if (sectionKey === "trees") return null;
+    const section = mergedData.sections[sectionKey];
+
+    return (
+      <tr>
+        <td style={cellStyle}>Mulch Bed Coverage</td>
+        <td style={cellStyle}></td>
+        {MULCH_AREA_KEYS.map((areaKey) => (
+          <td key={areaKey} style={cellStyle}>
+            {numberInput(section.areas[areaKey].coverage, (value) => updateAreaField(sectionKey, areaKey, "coverage", value), "1")}%
+          </td>
+        ))}
+        <td colSpan={5} style={cellStyle}></td>
+      </tr>
+    );
+  };
+
+  const renderDepthRow = (sectionKey) => {
+    const section = mergedData.sections[sectionKey];
+    const depthOptions = sectionKey === "finn" ? Object.keys(mulchingRates.finnDepth) : sectionKey === "trees" ? Object.keys(mulchingRates.treeDepth) : Object.keys(mulchingRates.depthInches);
+    const efficiencyOptions = Object.keys(mulchingRates.treeEfficiency);
+
+    return (
+      <tr>
+        <td style={cellStyle}>{sectionKey === "trees" ? "DEPTH/EFFICIENCY" : "Depth/Proximity"}</td>
+        <td style={cellStyle}></td>
+        {MULCH_AREA_KEYS.map((areaKey) => (
+          <td key={areaKey} style={cellStyle}>
+            <select value={section.areas[areaKey].depth} onChange={(e) => updateAreaField(sectionKey, areaKey, "depth", e.target.value)} style={{ ...selectStyle, width: "48%" }}>
+              {depthOptions.map((key) => <option key={key}>{key}</option>)}
+            </select>{" "}
+            {sectionKey === "trees" ? (
+              <select value={section.areas[areaKey].efficiency} onChange={(e) => updateAreaField(sectionKey, areaKey, "efficiency", e.target.value)} style={{ ...selectStyle, width: "48%" }}>
+                {efficiencyOptions.map((key) => <option key={key}>{key}</option>)}
+              </select>
+            ) : (
+              <select value={section.areas[areaKey].proximity} onChange={(e) => updateAreaField(sectionKey, areaKey, "proximity", e.target.value)} style={{ ...selectStyle, width: "48%" }}>
+                {Object.keys(mulchingRates.proximity).map((key) => <option key={key}>{key}</option>)}
+              </select>
+            )}
+          </td>
+        ))}
+        <td colSpan={5} style={cellStyle}></td>
+      </tr>
+    );
+  };
+
+  const renderSection = (sectionKey) => {
+    const section = mergedData.sections[sectionKey];
+    const sectionTotals = totals.sections[sectionKey];
+    const meta = SECTION_META[sectionKey];
+    const areaRate = sectionKey === "finn" ? mulchingRates.dollars.FINN : mulchingRates.dollars.HAND;
+    const extraRate = sectionKey === "finn" ? mulchingRates.dollars.HELPER : mulchingRates.dollars.SM_PWR;
+
+    return (
+      <React.Fragment key={sectionKey}>
+        <tr><td colSpan={10} style={{ ...cellStyle, textAlign: "left", fontWeight: "bold", paddingTop: "18px" }}>{meta.title}</td></tr>
+        <tr>
+          <th style={cellStyle}>ITEM</th>
+          <th style={cellStyle}>MISC</th>
+          {meta.itemLabels.map((label) => <th key={label} style={cellStyle}>{label}</th>)}
+          <th style={cellStyle}>{meta.equipmentLabel}</th>
+          <th style={cellStyle}>Loader Days</th>
+          <th style={cellStyle}>MULCH</th>
+          <th style={summaryLabelStyle}>HRS/OCC</th>
+          <th style={summaryValueStyle}>{sectionTotals.hoursPerOcc.toFixed(1)}</th>
+        </tr>
+        {renderAreaInputRow(sectionKey)}
+        {renderEfficiencyRow(sectionKey)}
+        {renderCoverageRow(sectionKey)}
+        {renderDepthRow(sectionKey)}
+        <tr>
+          <td style={cellStyle}>QTY/UNIT</td>
+          <td style={cellStyle}>{numberInput(section.miscHours, (value) => updateSectionField(sectionKey, "miscHours", value), "0.1")}<div>HRS</div></td>
+          {MULCH_AREA_KEYS.map((areaKey) => <td key={areaKey} style={cellStyle}><strong>{sectionTotals.areaTotals[areaKey].hours ? sectionTotals.areaTotals[areaKey].hours.toFixed(2) : "-"}</strong><div>HRS</div></td>)}
+          <td style={cellStyle}><strong>{sectionTotals.extraHours.toFixed(1)}</strong><div>HRS</div></td>
+          <td style={cellStyle}><strong>{sectionTotals.loaderHours.toFixed(1)}</strong><div>HRS</div></td>
+          <td style={cellStyle}><strong>{sectionTotals.mulchYards.toFixed(1)}</strong><div>YDS</div></td>
+          <td style={summaryLabelStyle}>$/OCC</td>
+          <td style={summaryValueStyle}>{formatCurrency(sectionTotals.totalOcc)}</td>
+        </tr>
+        <tr>
+          <td style={cellStyle}>UNIT $</td>
+          <td style={cellStyle}>{formatCurrency(mulchingRates.dollars.MISC)}</td>
+          {MULCH_AREA_KEYS.map((areaKey) => <td key={areaKey} style={cellStyle}>{formatCurrency(areaRate)}</td>)}
+          <td style={cellStyle}>{formatCurrency(extraRate)}</td>
+          <td style={cellStyle}>{formatCurrency(mulchingRates.dollars.LOADER)}</td>
+          <td style={cellStyle}>{formatCurrency(mulchingRates.dollars.MULCH)}</td>
+          <td colSpan={2} style={cellStyle}></td>
+        </tr>
+        <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
+          <td style={cellStyle}>TOTAL</td>
+          <td style={cellStyle}>{formatCurrency(sectionTotals.rowTotals.MISC)}</td>
+          {MULCH_AREA_KEYS.map((areaKey) => <td key={areaKey} style={cellStyle}>{formatCurrency(sectionTotals.rowTotals[areaKey])}</td>)}
+          <td style={cellStyle}>{formatCurrency(sectionTotals.rowTotals[sectionTotals.extraKey])}</td>
+          <td style={cellStyle}>{formatCurrency(sectionTotals.rowTotals.LOADER)}</td>
+          <td style={cellStyle}>{formatCurrency(sectionTotals.rowTotals.MULCH)}</td>
+          <td style={summaryLabelStyle}>TOTAL $</td>
+          <td style={summaryValueStyle}>{formatCurrency(sectionTotals.totalOcc)}</td>
+        </tr>
+        <tr>
+          <td style={cellStyle}></td>
+          <td style={cellStyle}></td>
+          {MULCH_AREA_KEYS.map((areaKey) => <td key={areaKey} style={cellStyle}>Mulch: {sectionTotals.areaTotals[areaKey].mulch.toFixed(1)}</td>)}
+          <td style={cellStyle}></td>
+          <td style={summaryLabelStyle}>TOTAL MAT:</td>
+          <td style={summaryValueStyle}>{formatCurrency(sectionTotals.totalMat)}</td>
+          <td style={summaryLabelStyle}>TOT HRS</td>
+          <td style={summaryValueStyle}>{sectionTotals.hoursPerOcc.toFixed(2)}</td>
+        </tr>
+      </React.Fragment>
+    );
+  };
 
   return (
-    <div
-      style={{
-        marginTop: "0.5rem",
-        padding: "0.75rem",
-        border: "1px solid #ccc",
-        borderRadius: "6px",
-        background: "#fdfdfd",
-        maxWidth: "900px",
-      }}
-    >
-      <MulchingCommonTable
-        mergedData={mergedData}
-        mulchingRates={mulchingRates}
-        handleCommonFieldChange={handleCommonFieldChange}
-        handleCommonHoursOverrideChange={handleCommonHoursOverrideChange}
-        handleCommonMulchOverrideChange={handleCommonMulchOverrideChange}
-        smPwrCommonSelection={smPwrCommonSelection}
-        loaderCommonSelection={loaderCommonSelection}
-        smPwrCommonDisplay={smPwrCommonDisplay}
-        loaderCommonDisplay={loaderCommonDisplay}
-        computedSmPwrCommonHours={computedSmPwrCommonHours}
-        computedLoaderCommonHours={computedLoaderCommonHours}
-        handleSmPwrCommonSelectionChange={handleSmPwrCommonSelectionChange}
-        handleSmPwrCommonOverrideChange={handleSmPwrCommonOverrideChange}
-        handleLoaderCommonSelectionChange={handleLoaderCommonSelectionChange}
-        handleLoaderCommonOverrideChange={handleLoaderCommonOverrideChange}
-        tableStyle={tableStyle}
-        thStyle={thStyle}
-        tdStyle={tdStyle}
-        inputStyle={inputStyle}
-        tablePrice={commonPrice}
-        formatCurrency={formatCurrency}
-      />
-
-      <MulchingHomesTable
-        mergedData={mergedData}
-        mulchingRates={mulchingRates}
-        handleHomeFieldChange={handleHomeFieldChange}
-        handleHomeHoursOverrideChange={handleHomeHoursOverrideChange}
-        handleHomeMulchOverrideChange={handleHomeMulchOverrideChange}
-        smPwrHomesSelection={smPwrHomesSelection}
-        loaderHomesSelection={loaderHomesSelection}
-        smPwrHomesDisplay={smPwrHomesDisplay}
-        loaderHomesDisplay={loaderHomesDisplay}
-        computedSmPwrHomesHours={computedSmPwrHomesHours}
-        computedLoaderHomesHours={computedLoaderHomesHours}
-        handleSmPwrHomesSelectionChange={handleSmPwrHomesSelectionChange}
-        handleSmPwrHomesOverrideChange={handleSmPwrHomesOverrideChange}
-        handleLoaderHomesSelectionChange={handleLoaderHomesSelectionChange}
-        handleLoaderHomesOverrideChange={handleLoaderHomesOverrideChange}
-        tableStyle={tableStyle}
-        thStyle={thStyle}
-        tdStyle={tdStyle}
-        inputStyle={inputStyle}
-        tablePrice={homesPrice}
-        formatCurrency={formatCurrency}
-      />
-
-      {/* LIVE PREVIEW */}
-      <div
-        style={{
-          marginTop: "0.75rem",
-          padding: "0.5rem",
-          border: "1px solid #ddd",
-          borderRadius: "4px",
-          background: "#fff",
-          fontSize: "0.85rem",
-        }}
-      >
-        <strong>Mulch Preview</strong>
-        <div style={{ marginTop: "0.25rem" }}>
-          <div>
-            Total Mulch Yards:{" "}
-            <strong>{totalMulchYards.toFixed(1)}</strong>
+    <div style={{ marginTop: "0.5rem", padding: "0.75rem", border: "1px solid #ccc", background: "#fdfdfd", overflowX: "auto" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 220px 220px 220px", gap: "12px", alignItems: "end", minWidth: "980px", marginBottom: "12px" }}>
+        <label>
+          <strong>Mulch Service Name</strong>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <input
+              value={mergedData.name || "Mulch"}
+              onChange={(e) => updateRootField("name", e.target.value)}
+              style={{ ...inputStyle, width: "100%" }}
+            />
+            {onDelete && (
+              <button className="danger-button compact-button" onClick={onDelete} type="button">
+                Delete
+              </button>
+            )}
           </div>
-          <div>
-            Total Labor Hours:{" "}
-            <strong>{totalHours.toFixed(2)}</strong>
-          </div>
-          <div>
-            Total Price:{" "}
-            <strong>{formatCurrency(totalPrice)}</strong>
-          </div>
-          <div
-            style={{
-              fontSize: "0.75rem",
-              color: "#666",
-              marginTop: "0.25rem",
-            }}
-          >
-            Areas: {totalAreaHours.toFixed(2)} hrs · Sm Pwr:{" "}
-            {totalSmPwrHours.toFixed(2)} hrs · Loader:{" "}
-            {totalLoaderHours.toFixed(2)} hrs
-          </div>
-        </div>
+        </label>
+        <label>
+          <strong>Enter Mulching Occurrences:</strong>
+          <input type="number" min="0" step="1" value={mergedData.occurrences} onChange={(e) => updateRootField("occurrences", Number(e.target.value) || 0)} style={{ ...inputStyle, width: "100%" }} />
+        </label>
+        <div><strong>Mulch Install Total Price:</strong><br />{formatCurrency(totals.totalPrice)}</div>
+        <div><strong>Mulch Install Total Hours:</strong><br />{totals.totalHours.toFixed(1)}</div>
+        <div></div><div></div><div><strong>Total Mulch Yards:</strong><br />{totals.mulchYards.toFixed(1)}</div><div><strong>Price per Yard:</strong><br />{totals.pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.pricePerYard)}</div>
       </div>
+
+      <table border="1" style={{ minWidth: "1250px", width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
+        <tbody>
+          {Object.keys(SECTION_META).map((sectionKey) => renderSection(sectionKey))}
+        </tbody>
+      </table>
     </div>
   );
 }

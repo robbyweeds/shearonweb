@@ -6,8 +6,9 @@ import React, { useEffect, useState } from "react";
 import { useServiceContext } from "../../context/ServiceContext";
 import { INITIAL_SPRING_TABLE, SPRING_DEFAULT_RATES } from "./springDefaults";
 import { computeSpringTotals } from "./springCalculations";
+import { formatCurrency } from "../../utils/formatters";
 
-export default function SpringTable({ tableId }) {
+export default function SpringTable({ tableId, onDelete }) {
   const { currentServices, updateService } = useServiceContext();
 
   const existingList = currentServices.springServices || [];
@@ -92,18 +93,24 @@ export default function SpringTable({ tableId }) {
   return (
     <div style={{ fontSize: "0.8rem", marginBottom: "1rem" }}>
       {/* NAME */}
-      <input
-        value={localData.name}
-        placeholder="Spring Service Name"
-        onChange={(e) =>
-          setLocalData((p) => ({ ...p, name: e.target.value }))
-        }
-        style={{
-          width: "100%",
-          padding: "4px",
-          marginBottom: "4px",
-        }}
-      />
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "4px" }}>
+        <input
+          value={localData.name}
+          placeholder="Spring Service Name"
+          onChange={(e) =>
+            setLocalData((p) => ({ ...p, name: e.target.value }))
+          }
+          style={{
+            width: "100%",
+            padding: "4px",
+          }}
+        />
+        {onDelete && (
+          <button className="danger-button compact-button" onClick={onDelete} type="button">
+            Delete
+          </button>
+        )}
+      </div>
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
@@ -182,8 +189,8 @@ export default function SpringTable({ tableId }) {
           <tr>
             <td colSpan={7} style={{ textAlign: "center", padding: "4px" }}>
               <strong>
-                Hrs/Occ: {localData.summary.hoursPerOcc.toFixed(2)} — Total: $
-                {localData.summary.totalDollars.toFixed(2)}
+                Hrs/Occ: {localData.summary.hoursPerOcc.toFixed(2)} — Total:{" "}
+                {formatCurrency(localData.summary.totalDollars)}
               </strong>
             </td>
           </tr>

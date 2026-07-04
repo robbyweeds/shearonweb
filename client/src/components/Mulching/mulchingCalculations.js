@@ -1,166 +1,189 @@
 // myapp/client/src/components/Mulching/mulchingCalculations.js
 
-import { INITIAL_MULCHING_DATA } from "./mulchingDefaults";
+import { DEFAULT_MULCHING_RATES, INITIAL_MULCHING_DATA, MULCH_AREA_KEYS, MULCH_SECTION_KEYS } from "./mulchingDefaults";
+export { formatCurrency } from "../../utils/formatters";
 
-/* ============================================================
-   Currency Formatting
-   ============================================================ */
-export function formatCurrency(value) {
-  const num = Number(value) || 0;
-  return num.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+const round1 = (value) => Number((Math.round(Number(value || 0) * 10) / 10).toFixed(1));
+const round2 = (value) => Number(Number(value || 0).toFixed(2));
+
+export function mergeMulchingRates(rates = {}) {
+  return {
+    ...DEFAULT_MULCHING_RATES,
+    ...rates,
+    dollars: { ...DEFAULT_MULCHING_RATES.dollars, ...(rates.dollars || {}) },
+    handEfficiency: { ...DEFAULT_MULCHING_RATES.handEfficiency, ...(rates.handEfficiency || {}) },
+    treeRingSize: { ...DEFAULT_MULCHING_RATES.treeRingSize, ...(rates.treeRingSize || {}) },
+    treeEfficiency: { ...DEFAULT_MULCHING_RATES.treeEfficiency, ...(rates.treeEfficiency || {}) },
+    treeDepth: { ...DEFAULT_MULCHING_RATES.treeDepth, ...(rates.treeDepth || {}) },
+    depthInches: { ...DEFAULT_MULCHING_RATES.depthInches, ...(rates.depthInches || {}) },
+    smPowerManHours: { ...DEFAULT_MULCHING_RATES.smPowerManHours, ...(rates.smPowerManHours || {}) },
+    loaderManHours: { ...DEFAULT_MULCHING_RATES.loaderManHours, ...(rates.loaderManHours || {}) },
+    proximity: { ...DEFAULT_MULCHING_RATES.proximity, ...(rates.proximity || {}) },
+    finnEfficiency: { ...DEFAULT_MULCHING_RATES.finnEfficiency, ...(rates.finnEfficiency || {}) },
+    finnDepth: { ...DEFAULT_MULCHING_RATES.finnDepth, ...(rates.finnDepth || {}) },
+    finnHelper: { ...DEFAULT_MULCHING_RATES.finnHelper, ...(rates.finnHelper || {}) },
+  };
 }
 
-/* ============================================================
-   Deep Merge
-   ============================================================ */
-export function mergeMulchingData(raw) {
+export function mergeMulchingData(raw = {}) {
   const base = raw || {};
+  const sections = {};
 
-  const BASE_INITIAL = {
-    ...INITIAL_MULCHING_DATA,
+  MULCH_SECTION_KEYS.forEach((sectionKey) => {
+    const initialSection = INITIAL_MULCHING_DATA.sections[sectionKey];
+    const savedSection = base.sections?.[sectionKey] || {};
+    const areas = {};
 
-    smPwrCommon: {
-      selection: "Average",
-      hoursOverride: null,
-      ...(INITIAL_MULCHING_DATA.smPwrCommon || {}),
-    },
-    loaderCommon: {
-      selection: "Average",
-      hoursOverride: null,
-      ...(INITIAL_MULCHING_DATA.loaderCommon || {}),
-    },
-    smPwrHomes: {
-      selection: "Average",
-      hoursOverride: null,
-      ...(INITIAL_MULCHING_DATA.smPwrHomes || {}),
-    },
-    loaderHomes: {
-      selection: "Average",
-      hoursOverride: null,
-      ...(INITIAL_MULCHING_DATA.loaderHomes || {}),
-    },
-  };
+    MULCH_AREA_KEYS.forEach((areaKey) => {
+      areas[areaKey] = {
+        ...initialSection.areas[areaKey],
+        ...(savedSection.areas?.[areaKey] || {}),
+      };
+    });
 
-  const rawCommon = base.handCommonAreas || {};
-  const rawHomes = base.handHomes || {};
+    sections[sectionKey] = {
+      ...initialSection,
+      ...savedSection,
+      areas,
+    };
+  });
 
   return {
-    ...BASE_INITIAL,
+    ...INITIAL_MULCHING_DATA,
     ...base,
-
-    summary: {
-      ...BASE_INITIAL.summary,
-      ...(base.summary || {}),
-    },
-
-    handCommonAreas: {
-      ...BASE_INITIAL.handCommonAreas,
-      ...rawCommon,
-      area1: { ...BASE_INITIAL.handCommonAreas.area1, ...(rawCommon.area1 || {}) },
-      area2: { ...BASE_INITIAL.handCommonAreas.area2, ...(rawCommon.area2 || {}) },
-      area3: { ...BASE_INITIAL.handCommonAreas.area3, ...(rawCommon.area3 || {}) },
-    },
-
-    handHomes: {
-      ...BASE_INITIAL.handHomes,
-      ...rawHomes,
-      home1: { ...BASE_INITIAL.handHomes.home1, ...(rawHomes.home1 || {}) },
-      home2: { ...BASE_INITIAL.handHomes.home2, ...(rawHomes.home2 || {}) },
-      home3: { ...BASE_INITIAL.handHomes.home3, ...(rawHomes.home3 || {}) },
-    },
-
-    smPwrCommon: {
-      ...BASE_INITIAL.smPwrCommon,
-      ...(base.smPwrCommon || {}),
-    },
-    loaderCommon: {
-      ...BASE_INITIAL.loaderCommon,
-      ...(base.loaderCommon || {}),
-    },
-    smPwrHomes: {
-      ...BASE_INITIAL.smPwrHomes,
-      ...(base.smPwrHomes || {}),
-    },
-    loaderHomes: {
-      ...BASE_INITIAL.loaderHomes,
-      ...(base.loaderHomes || {}),
-    },
+    occurrences: Number(base.occurrences ?? base.summary?.numOccurrences ?? INITIAL_MULCHING_DATA.occurrences),
+    sections,
   };
 }
 
-/* ============================================================
-   Helpers
-   ============================================================ */
-
-function getRate(table, key, fallback = 0) {
-  if (!table) return fallback;
-  if (table[key] !== undefined) return table[key];
-  return fallback;
+function mulchYardsFromSqft(sqft, coveragePercent, depthInches) {
+  const sqftNum = Number(sqft || 0);
+  const coverage = Number(coveragePercent || 0) / 100;
+  const depth = Number(depthInches || 0);
+  if (sqftNum <= 0 || coverage <= 0 || depth <= 0) return 0;
+  return round1(((sqftNum * coverage) * (depth / 12)) / 27);
 }
 
-// Excel mulch formula
-function computeMulchYards(sqft, depthInches) {
-  if (!sqft || !depthInches) return 0;
-  const raw = (sqft * (depthInches / 12)) / 27;
-  return Math.ceil(raw);
+function computeHandArea(area, rates) {
+  const depth = Number(rates.depthInches[area.depth] || 0);
+  const mulch = mulchYardsFromSqft(area.sqft, area.coverage, depth);
+  const efficiency = Number(rates.handEfficiency[area.efficiency] || 0);
+  const proximity = Number(rates.proximity[area.proximity] || 1);
+  const hours = efficiency > 0 ? (mulch / efficiency) * proximity : 0;
+  return { mulch, hours: round2(hours), sqft: Number(area.sqft || 0) };
 }
 
-/* ============================================================
-   Common Areas (Excel logic)
-   ============================================================ */
-
-export function computeCommonAreaValues(area, mulchingRates) {
-  if (!mulchingRates) return { hours: 0, mulch: 0 };
-
-  const sqft = Number(area.sqft) || 0;
-  if (sqft <= 0) return { hours: 0, mulch: 0 };
-
-  // Pull correct rates
-  const handEff = getRate(mulchingRates.handEfficiency, area.efficiency, 0);
-  const proximity = getRate(mulchingRates.proximity, area.proximity, 1);
-  const depthInches = getRate(mulchingRates.depthInches, area.depth, 0);
-
-  // MULCH
-  const mulch = computeMulchYards(sqft, depthInches);
-
-  // HOURS (Excel)
-  let hours = 0;
-  if (handEff > 0) hours = (mulch / handEff) * proximity;
-
-  return { hours, mulch };
+function computeHomeArea(area, rates) {
+  const totalSqft = Number(area.sqftEach || 0) * Number(area.count || 0);
+  return { ...computeHandArea({ ...area, sqft: totalSqft }, rates), sqft: totalSqft };
 }
 
-/* ============================================================
-   Homes (Excel logic)
-   ============================================================ */
+function computeTreeArea(area, rates) {
+  const qty = Number(area.qty || 0);
+  const diameter = Number(rates.treeRingSize[area.diameter] || 0);
+  const sqft = qty * Math.PI * Math.pow(diameter / 2, 2);
+  const depth = Number(rates.treeDepth[area.depth] || 0);
+  const mulch = mulchYardsFromSqft(sqft, 100, depth);
+  const efficiency = Number(rates.treeEfficiency[area.efficiency] || 0);
+  const hours = efficiency > 0 ? mulch / efficiency : 0;
+  return { mulch, hours: round2(hours), sqft: round2(sqft) };
+}
 
-export function computeHomeValues(home, mulchingRates) {
-  if (!mulchingRates) return { hours: 0, mulch: 0, totalSqft: 0 };
+function computeFinnArea(area, rates) {
+  const depth = Number(rates.finnDepth[area.depth] || rates.depthInches[area.depth] || 0);
+  const mulch = mulchYardsFromSqft(area.sqft, area.coverage, depth);
+  const efficiency = Number(rates.finnEfficiency[area.efficiency] || 0);
+  const hours = efficiency > 0 ? mulch / efficiency : 0;
+  return { mulch, hours: round2(hours), sqft: Number(area.sqft || 0) };
+}
 
-  const sqftEach = Number(home.sqftEach) || 0;
-  const count = Number(home.count) || 0;
+export function computeMulchingSection(sectionKey, section, ratesInput = {}) {
+  const rates = mergeMulchingRates(ratesInput);
+  const areaTotals = {};
+  let areaHours = 0;
+  let mulchYards = 0;
 
-  if (sqftEach <= 0 || count <= 0)
-    return { hours: 0, mulch: 0, totalSqft: 0 };
+  MULCH_AREA_KEYS.forEach((areaKey) => {
+    const area = section.areas[areaKey];
+    let computed;
+    if (sectionKey === "homes") computed = computeHomeArea(area, rates);
+    else if (sectionKey === "trees") computed = computeTreeArea(area, rates);
+    else if (sectionKey === "finn") computed = computeFinnArea(area, rates);
+    else computed = computeHandArea(area, rates);
 
-  const totalSqft = sqftEach * count;
+    areaTotals[areaKey] = computed;
+    areaHours += computed.hours;
+    mulchYards += computed.mulch;
+  });
 
-  // Pull correct rates
-  const handEff = getRate(mulchingRates.handEfficiency, home.efficiency, 0);
-  const proximity = getRate(mulchingRates.proximity, home.proximity, 1);
-  const depthInches = getRate(mulchingRates.depthInches, home.depth, 0);
+  const miscHours = Number(section.miscHours || 0);
+  const loaderHours = Number(section.loaderHours || 0);
+  const extraKey = sectionKey === "finn" ? "HELPER" : "SM_PWR";
+  const extraRateKey = sectionKey === "finn" ? "HELPER" : "SM_PWR";
+  let extraHours = 0;
 
-  // MULCH
-  const mulch = computeMulchYards(totalSqft, depthInches);
+  if (sectionKey === "finn") {
+    const helperFactor = Number(rates.finnHelper[section.helper] || 0);
+    extraHours = areaHours * helperFactor;
+  } else {
+    const smPwrRate = Number(rates.smPowerManHours[section.smPwr] || 0);
+    extraHours = smPwrRate > 0 ? areaHours / smPwrRate : 0;
+  }
 
-  // HOURS
-  let hours = 0;
-  if (handEff > 0) hours = (mulch / handEff) * proximity;
+  const hoursPerOcc = miscHours + areaHours + extraHours + loaderHours;
+  const laborRate = sectionKey === "finn" ? rates.dollars.FINN : rates.dollars.HAND;
 
-  return { hours, mulch, totalSqft };
+  const rowTotals = {
+    MISC: miscHours * Number(rates.dollars.MISC || 0),
+    area1: areaTotals.area1.hours * Number(laborRate || 0),
+    area2: areaTotals.area2.hours * Number(laborRate || 0),
+    area3: areaTotals.area3.hours * Number(laborRate || 0),
+    [extraKey]: extraHours * Number(rates.dollars[extraRateKey] || 0),
+    LOADER: loaderHours * Number(rates.dollars.LOADER || 0),
+    MULCH: mulchYards * Number(rates.dollars.MULCH || 0),
+  };
+
+  const totalMat = rowTotals.MULCH;
+  const totalOcc = Object.values(rowTotals).reduce((sum, value) => sum + Number(value || 0), 0);
+
+  return {
+    areaTotals,
+    miscHours,
+    areaHours: round2(areaHours),
+    extraKey,
+    extraHours: round2(extraHours),
+    loaderHours,
+    mulchYards: round1(mulchYards),
+    hoursPerOcc: round2(hoursPerOcc),
+    rowTotals,
+    totalMat,
+    totalOcc,
+    pricePerYard: mulchYards > 0 ? totalOcc / mulchYards : null,
+  };
+}
+
+export function computeMulchingTotals(dataInput = {}, ratesInput = {}) {
+  const data = mergeMulchingData(dataInput);
+  const rates = mergeMulchingRates(ratesInput);
+  const sections = {};
+
+  MULCH_SECTION_KEYS.forEach((sectionKey) => {
+    sections[sectionKey] = computeMulchingSection(sectionKey, data.sections[sectionKey], rates);
+  });
+
+  const occurrences = Number(data.occurrences || 0);
+  const totalOcc = Object.values(sections).reduce((sum, section) => sum + section.totalOcc, 0);
+  const hoursPerOcc = Object.values(sections).reduce((sum, section) => sum + section.hoursPerOcc, 0);
+  const mulchYards = Object.values(sections).reduce((sum, section) => sum + section.mulchYards, 0);
+
+  return {
+    sections,
+    occurrences,
+    totalOcc,
+    totalPrice: totalOcc * occurrences,
+    hoursPerOcc,
+    totalHours: hoursPerOcc * occurrences,
+    mulchYards: round1(mulchYards),
+    pricePerYard: mulchYards > 0 ? totalOcc / mulchYards : null,
+  };
 }

@@ -40,8 +40,14 @@ export default function PruningForm() {
   // -----------------------------
   // Add new pruning table
   // -----------------------------
+  const getNextTableNumber = () =>
+    Math.max(
+      0,
+      ...tables.map((table) => Number(String(table.id).replace("Pruning", "")) || 0)
+    ) + 1;
+
   const addTable = () => {
-    const newId = `Pruning${tables.length + 1}`;
+    const newId = `Pruning${getNextTableNumber()}`;
 
     const newTable = {
       id: newId,
@@ -79,7 +85,7 @@ export default function PruningForm() {
     <div className="service-entry-page pruning-entry-page">
       <h2 style={{ marginBottom: "1rem" }}>Pruning</h2>
 
-      {tables.map((t) => (
+      {tables.map((t, index) => (
         <div
           key={t.id}
           style={{
@@ -90,24 +96,11 @@ export default function PruningForm() {
             background: "#fafafa",
           }}
         >
-          <PruningTable key={`${t.id}-${resetNonce}`} tableId={t.id} />
-
-          <div style={{ textAlign: "right" }}>
-            <button
-              onClick={() => deleteTable(t.id)}
-              style={{
-                marginTop: "0.25rem",
-                padding: "4px 8px",
-                background: "#dc3545",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              Delete
-            </button>
-          </div>
+          <PruningTable
+            key={`${t.id}-${resetNonce}`}
+            tableId={t.id}
+            onDelete={index > 0 ? () => deleteTable(t.id) : null}
+          />
         </div>
       ))}
 

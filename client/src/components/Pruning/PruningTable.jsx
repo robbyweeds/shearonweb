@@ -3,8 +3,9 @@ import React, { useEffect, useState } from "react";
 import { useServiceContext } from "../../context/ServiceContext";
 import { computePruningTotals } from "./pruningCalculations";
 import { INITIAL_PRUNING_TABLE } from "./pruningDefaults";
+import { formatCurrency } from "../../utils/formatters";
 
-export default function PruningTable({ tableId }) {
+export default function PruningTable({ tableId, onDelete }) {
   const { currentServices, updateService, currentRates } = useServiceContext();
 
   // Always an array
@@ -92,19 +93,25 @@ export default function PruningTable({ tableId }) {
 
   return (
     <div style={{ fontSize: "0.75rem", maxWidth: "480px" }}>
-      <input
-        value={localData.name}
-        placeholder="Pruning Type ( Summer / Fall / Tree )"
-        onChange={(e) =>
-          setLocalData((p) => ({ ...p, name: e.target.value }))
-        }
-        style={{
-          width: "100%",
-          padding: "4px",
-          marginBottom: "4px",
-          fontSize: "0.75rem",
-        }}
-      />
+      <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", marginBottom: "4px" }}>
+        <input
+          value={localData.name}
+          placeholder="Pruning Type ( Summer / Fall / Tree )"
+          onChange={(e) =>
+            setLocalData((p) => ({ ...p, name: e.target.value }))
+          }
+          style={{
+            width: "100%",
+            padding: "4px",
+            fontSize: "0.75rem",
+          }}
+        />
+        {onDelete && (
+          <button className="danger-button compact-button" onClick={onDelete} type="button">
+            Delete
+          </button>
+        )}
+      </div>
 
       <table
         style={{
@@ -165,7 +172,7 @@ export default function PruningTable({ tableId }) {
             <td colSpan={6} style={{ textAlign: "center", padding: "4px" }}>
               <strong>
                 Hrs/Occ: {localData.summary.hoursPerOcc.toFixed(2)} &nbsp;|&nbsp;
-                Total: ${localData.summary.totalDollars.toFixed(2)}
+                Total: {formatCurrency(localData.summary.totalDollars)}
               </strong>
             </td>
           </tr>
