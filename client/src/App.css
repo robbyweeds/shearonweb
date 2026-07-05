@@ -504,6 +504,13 @@ button:disabled:hover {
   font-weight: 800;
 }
 
+.summary-row-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
 @media (max-width: 820px) {
   .app-shell,
   .two-column,

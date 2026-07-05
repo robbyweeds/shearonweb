@@ -1,0 +1,2606 @@
+SHEARON / ROBBYWEEDS BID SHEET APPLICATION MANUAL
+==================================================
+
+File: server/manual.txt
+Application base path: /shearon
+Primary client framework: React
+Primary server framework: Express
+Primary database: SQLite through better-sqlite3
+
+Document purpose
+----------------
+This manual explains the current app logic in depth. It is written from the codebase as it exists now, with emphasis on:
+
+1. The main project page.
+2. The services summary page.
+3. Every service entry page.
+4. The formulas used to calculate hours, dollars, totals, and preview summaries.
+5. The save/load flow between the browser, React state, localStorage, and the server database.
+6. The rate systems used by mowing, mulching, pruning, leaves, turf applications, and other services.
+7. Examples showing how important formulas work.
+
+This manual is intentionally detailed. It is meant to be a working reference for users, maintainers, and future developers.
+
+
+================================================================================
+1. HIGH LEVEL APPLICATION STRUCTURE
+================================================================================
+
+The app is a project estimating and service bid builder. A user starts by creating or loading a project, then adds one or more services. Each service page stores service data in shared React state. The Services page reads all selected services, calculates their visible preview totals, and can save the whole project to the backend.
+
+The major application parts are:
+
+- Main project setup page: client/src/components/ProjectForm.jsx
+- Services summary page: client/src/components/ServicesPage.jsx
+- Shared state: client/src/context/ServiceContext.jsx
+- Routing: client/src/App.js
+- Backend server: server/server.js
+- Database: server/database.db
+
+The app is mounted with React Router using basename /shearon. That means the visible browser paths are under /shearon, such as:
+
+- /shearon/
+- /shearon/services
+- /shearon/services/mowing
+- /shearon/services/mulching
+- /shearon/services/pruning
+- /shearon/services/leaves
+- /shearon/services/spring-cleanup
+- /shearon/services/turf-app
+- /shearon/services/flowers
+- /shearon/services/extras
+
+Internally, the route paths are written without /shearon because BrowserRouter applies the basename.
+
+The app uses client-side state while the user is editing. The server is only updated when the user clicks Save Project on the Services page. Creating service rows, changing hours, calculating totals, and navigating between service pages are all handled in the browser until Save Project is used.
+
+
+================================================================================
+2. APPLICATION ROUTING
+================================================================================
+
+Routes are defined in client/src/App.js.
+
+Project and summary routes:
+
+- / -> ProjectForm
+- /services -> ServicesPage
+
+Service entry routes:
+
+- /services/mowing -> MowingForm
+- /services/mulching -> MulchingForm
+- /services/pruning -> PruningForm
+- /services/leaves -> LeavesForm
+- /services/spring-cleanup -> SpringCleanupForm
+- /services/turf-app -> TurfAppForm
+- /services/flowers -> FlowersForm
+- /services/extras -> ExtrasForm
+
+Rate edit routes:
+
+- /mowing-rates -> MowingRatesPage
+- /mulching-rates -> MulchingRatesPage
+- /pruning-rates -> PruningRatesPage
+- /turf-app-rates -> TurfAppRatesPage
+- /leaves-rates -> LeavesRatesPage
+
+The App component also contains two global behaviors:
+
+1. ScrollToTop
+   Whenever the route pathname changes, the app scrolls to the top of the page.
+
+2. Clear zero number inputs on focus
+   The wrapper div listens for focus events on number inputs. If the focused input currently contains a numeric zero, the displayed value is cleared. This improves entry speed because the user can click into a field that says 0 and immediately type a new value.
+
+Important detail:
+This zero-clearing behavior only changes the visible input value at focus time. The actual React state changes only when the input onChange event fires.
+
+
+================================================================================
+3. SHARED STATE: SERVICE CONTEXT
+================================================================================
+
+Shared service and rate state lives in client/src/context/ServiceContext.jsx.
+
+The ServiceProvider exposes:
+
+- currentServices
+- updateService(serviceName, data)
+- getAllServices()
+- currentRates
+- updateRates(key, value)
+- resetServices()
+- resetRates()
+
+currentServices default structure:
+
+- mowing: []
+- edging: null
+- bedMaintenance: null
+- mulching: null
+- pruning: []
+- leaves: null
+- springCleanup: null
+- turfApp: []
+- flowers: []
+- extras: []
+
+This structure matters because some services support multiple tables and some services are single-table services.
+
+Multi-table services:
+
+- mowing
+- mulching
+- pruning
+- turfApp
+- flowers
+- extras
+
+Single logical services:
+
+- edging
+- bedMaintenance
+- leaves
+- springCleanup
+
+Edging and Bed Maintenance are currently attached to the Mowing page through ServiceTablesWrapper. In the Services preview table, their Edit button routes to /services/mowing because that is where their form controls live.
+
+currentRates default structure:
+
+- mowingFactors
+- mowingDollars
+- mulchingRates
+- pruningRates
+- turfAppRates
+- leavesRates
+
+Rates are kept in the browser state. When a project is saved, the Services page also saves the currentRates object into the services payload under the special key __rates. When a saved project is loaded, ProjectForm reads that __rates object and restores each rate group into the shared rate state.
+
+This means a saved project can carry the rate assumptions that were used at the time it was saved.
+
+
+================================================================================
+4. MAIN PAGE: PROJECT SETUP
+================================================================================
+
+Component: client/src/components/ProjectForm.jsx
+
+Purpose:
+The main page creates a new project or loads an existing project. It also shows recent saved projects and lets the user delete them.
+
+Main fields:
+
+- Project Name
+- Date
+- Turf Acres
+
+The internal field name is still acres. Only the user-facing label says Turf Acres. The same acres field is stored in the project object and sent to the server.
+
+Project object shape in the browser:
+
+{
+  id: null or number,
+  projectName: string,
+  date: string,
+  acres: string or number
+}
+
+Main page workflow:
+
+1. On page load, fetchProjects() calls GET /projects?limit=10.
+2. The returned projects are displayed in Recent Projects.
+3. The user can enter Project Name, Date, and Turf Acres.
+4. Clicking Create runs handleContinue.
+5. handleContinue requires all three fields.
+6. If this is a new project with no id, service state and rates are reset.
+7. The project is stored in localStorage under key project.
+8. The app navigates to /services.
+
+The main page does not immediately save a new project to SQLite. A project is persisted only when Save Project is clicked on the Services page.
+
+Recent Projects list:
+
+Each recent project card shows:
+
+- Project name
+- Short date
+- Acres display
+- Calculated contract total
+- Load button
+- Delete button
+
+The contract total shown on the main page is recalculated in ProjectForm using the saved services object for each project. It does not simply display a stored total. The app reconstructs service totals from saved service data and saved rate data.
+
+Loading a project:
+
+When Load is clicked:
+
+1. GET /project/:id is requested.
+2. The returned project fields are converted to the app project object.
+3. Existing browser service state is reset.
+4. The loaded project is put into form state.
+5. Each saved service is normalized and restored into ServiceContext.
+6. Saved rates from __rates are restored into currentRates.
+7. The project object is saved to localStorage.
+8. The app navigates to /services.
+
+Deleting a project:
+
+When Delete is clicked:
+
+1. The browser asks for confirmation.
+2. DELETE /project/:id is requested.
+3. The server deletes service rows for the project and then deletes the project row.
+4. If the deleted project was currently loaded, browser state is cleared, service state is reset, rates are reset, and localStorage project is removed.
+5. The recent project list is fetched again.
+
+Main page total calculation:
+
+The main page uses getProjectContractTotal(project). This function loops through all saved services and adds each service's calculated final total.
+
+It includes:
+
+- mowing final totals
+- mulching total price
+- pruning final total
+- edging final total
+- bed maintenance final total
+- leaves final total
+- spring cleanup total dollars
+- turf app final total
+- flowers total dollars
+- extras total dollars
+
+Saved rates:
+
+If the project has a services.__rates object, those rates are used in the main-page total calculation. If a saved rate section is missing, the app falls back to defaults.
+
+
+================================================================================
+5. SERVICES PAGE: SUMMARY, PROJECT EDITING, SAVE, PDF, AND EDIT BUTTONS
+================================================================================
+
+Component: client/src/components/ServicesPage.jsx
+
+Purpose:
+The Services page is the central estimate dashboard after project setup. It shows project metadata, service navigation buttons, a service summary table, total project dollars, PDF download, and Save Project.
+
+Project metadata displayed:
+
+- Project name, editable with Edit Name / Save New Name
+- Date
+- Turf Acres, editable directly on this page
+- Estimated Total
+
+When Turf Acres changes on this page, handleProjectFieldChange updates both local React state and localStorage project.
+
+Service navigation buttons:
+
+- Mowing
+- Mulching
+- Pruning
+- Fall Cleanup
+- Spring Cleanup
+- Turf App
+- Flowers
+- Extras
+
+Each button navigates to its service form page.
+
+Service Summary table columns:
+
+- Service
+- Occurrences
+- Price / Occ
+- Total
+- Actions
+
+The Actions column now contains:
+
+- Edit
+- Remove
+
+Edit button behavior:
+
+Each summary row has an onEdit handler. It navigates to the page where that service is edited.
+
+- Mowing -> /services/mowing
+- Edging -> /services/mowing
+- Bed Maintenance -> /services/mowing
+- Mulching -> /services/mulching
+- Pruning -> /services/pruning
+- Fall Cleanup -> /services/leaves
+- Spring Cleanup -> /services/spring-cleanup
+- Turf App -> /services/turf-app
+- Flowers -> /services/flowers
+- Extras -> /services/extras
+
+For multi-table services, the edit button takes the user to the service page that contains the table. The current app does not deep-scroll or focus the exact table row; it opens the correct service page where the data is already loaded.
+
+Remove button behavior:
+
+Remove deletes that service entry from ServiceContext. For array-based services, it filters out the selected table id. For single services, it sets that service to null.
+
+Estimated Project Total:
+
+The Services page builds summaryRows from currentServices. Then:
+
+projectTotal = sum of row.total for all rows where row.total is a number
+
+Only services that produce a valid visible summary row are included. In most services, rows are only included if occurrences are greater than zero.
+
+Saving a project:
+
+Save Project runs handleSaveProject.
+
+Validation:
+
+- project.projectName must exist
+- project.date must exist
+- project.acres must exist
+
+The services payload is built from getAllServices(). Each service key is copied into a sanitized object. currentRates is added under __rates.
+
+If the project has an id:
+
+- PUT /project/:id is used
+- server updates the project row
+- server deletes old service rows for that project
+- server inserts current service rows
+
+If the project does not have an id:
+
+- POST /project is used
+- server inserts a new project
+- server inserts service rows
+- returned projectId is stored in browser state and localStorage
+
+After successful save:
+
+- browser alerts Project saved or Project updated
+- app navigates back to the main page
+
+PDF download:
+
+The Services page creates a PDF directly in the browser. It no longer relies on opening a popup print window. The PDF builder constructs a basic PDF document from summaryRows and downloads it as:
+
+[property-name]-service-preview.pdf
+
+The PDF includes:
+
+- Project name
+- Property name
+- Acres value
+- Date
+- Service rows
+- Occurrences
+- Price / Occ
+- Total
+- Estimated Project Total
+
+Direct file save behavior:
+
+The helper downloadPdfBlob first checks window.showSaveFilePicker. If supported, the browser can save the PDF directly without navigating away. If that API is unavailable, it falls back to a hidden anchor element with a blob URL and download attribute.
+
+The PDF generation logic creates PDF syntax manually:
+
+- text drawing commands are written into PDF page streams
+- rows are split across pages when necessary
+- Helvetica is used as the built-in font
+- text is normalized to ASCII-safe PDF text
+- long service labels are truncated
+
+Important implementation note:
+The app's PDF generator is intentionally simple. It is designed for summary tables, not high-end PDF design. It avoids a dependency but does not support complex styling like HTML-to-PDF libraries.
+
+
+================================================================================
+6. MOWING SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/MowingForm.jsx
+- Table: client/src/components/Mowing/MowingTable.jsx
+- Defaults: client/src/components/Mowing/mowingDefaults.js
+- Calculations: client/src/components/Mowing/mowingCalculations.js
+- Save helper: client/src/components/Mowing/mowingSave.js
+- Rates: client/src/components/Mowing/MowingRatesPage.jsx
+
+Purpose:
+Mowing estimates mowing hours and dollars for multiple mowing areas. It supports multiple mowing tables per project. Each table can have deck mowing areas, trimmer/blower time, miscellaneous hours, rotary, specialty, and 5111 line items.
+
+Default mowing table name:
+
+- Mowing Area
+
+Mowing table row groups:
+
+- MISC_HRS
+- 72-area1
+- 72-area2
+- 60-area1
+- 60-area2
+- 48-area1
+- 48-area2
+- TRIMMER
+- BLOWER
+- ROTARY
+- SPECIALTY
+- 5111
+
+Deck keys:
+
+- 72-area1
+- 72-area2
+- 60-area1
+- 60-area2
+- 48-area1
+- 48-area2
+
+Small power keys:
+
+- TRIMMER
+- BLOWER
+
+Mowing efficiency options:
+
+- OBSTACLES
+- HOA_HOMES
+- AVERAGE
+- OPEN_LAWN
+- FIELDS
+- MONTHLY
+- DOUBLE_CUT
+
+Small power efficiency options:
+
+- MINIMUM
+- LESS
+- AVERAGE
+- HOA_HOMES
+- HIGH_END_DETAILING
+
+Default acres-per-hour mowing factors:
+
+72 inch deck:
+
+- OBSTACLES: 0.65
+- HOA_HOMES: 0.85
+- AVERAGE: 0.95
+- OPEN_LAWN: 1.3
+- FIELDS: 1.45
+- MONTHLY: 0.6
+- DOUBLE_CUT: 0.7
+
+60 inch deck:
+
+- OBSTACLES: 0.6
+- HOA_HOMES: 0.75
+- AVERAGE: 0.85
+- OPEN_LAWN: 1.0
+- FIELDS: 1.25
+- MONTHLY: 0.55
+- DOUBLE_CUT: 0.7
+
+48 inch deck:
+
+- OBSTACLES: 0.4
+- HOA_HOMES: 0.6
+- AVERAGE: 0.65
+- OPEN_LAWN: 0.75
+- FIELDS: 0.9
+- MONTHLY: 0.35
+- DOUBLE_CUT: 0.45
+
+Default small power efficiency factors:
+
+TRIMMER:
+
+- MINIMUM: 0.75
+- LESS: 0.85
+- AVERAGE: 0.95
+- HOA_HOMES: 1.05
+- HIGH_END_DETAILING: 1.35
+
+BLOWER:
+
+- MINIMUM: 0.2
+- LESS: 0.3
+- AVERAGE: 0.35
+- HOA_HOMES: 0.45
+- HIGH_END_DETAILING: 0.55
+
+Default small power allocation:
+
+TRIMMER:
+
+- 72 inch mowing hours allocation: 0.1
+- 60 inch mowing hours allocation: 0.2
+- 48 inch mowing hours allocation: 0.75
+
+BLOWER:
+
+- 72 inch mowing hours allocation: 0.1
+- 60 inch mowing hours allocation: 0.2
+- 48 inch mowing hours allocation: 0.75
+
+Default mowing dollar rates:
+
+- MISC_HRS: 61
+- 72-area1: 51
+- 72-area2: 61
+- 60-area1: 61
+- 60-area2: 59
+- 48-area1: 56
+- 48-area2: 56
+- TRIMMER: 55
+- BLOWER: 55
+- ROTARY: 55
+- 5111: 100
+
+Mowing hour formula for deck rows:
+
+For each deck row:
+
+rawHours = acres / acresPerHourRate
+roundedHours = round rawHours to nearest quarter hour
+finalDeckHours = manualOverride if present, otherwise roundedHours
+
+The nearest quarter hour is calculated by:
+
+Math.round(rawHours * 4) / 4
+
+Example:
+
+- 72-area1 acres = 4.0
+- efficiency = AVERAGE
+- 72 inch AVERAGE rate = 0.95 acres/hour
+
+rawHours = 4.0 / 0.95 = 4.2105
+roundedHours = 4.25
+
+So 72-area1 qty/unit becomes 4.25 hours unless the user manually overrides it.
+
+Deck totals:
+
+After deck hours are calculated, the app sums hours by deck size:
+
+- deckTotals[72] = 72-area1 + 72-area2
+- deckTotals[60] = 60-area1 + 60-area2
+- deckTotals[48] = 48-area1 + 48-area2
+
+Small power formula:
+
+For TRIMMER or BLOWER:
+
+rawHours =
+  deckTotals[72] * allocation[72] * efficiencyFactor
++ deckTotals[60] * allocation[60] * efficiencyFactor
++ deckTotals[48] * allocation[48] * efficiencyFactor
+
+Then rawHours is rounded to the nearest quarter hour.
+
+Example:
+
+Assume:
+
+- 72 total hours = 4.25
+- 60 total hours = 2.00
+- 48 total hours = 1.00
+- TRIMMER allocations: 72 = 0.1, 60 = 0.2, 48 = 0.75
+- TRIMMER efficiency = AVERAGE = 0.95
+
+rawHours =
+  4.25 * 0.1 * 0.95
++ 2.00 * 0.2 * 0.95
++ 1.00 * 0.75 * 0.95
+
+rawHours = 0.40375 + 0.38 + 0.7125 = 1.49625
+roundedHours = 1.50
+
+Manual override behavior:
+
+Deck rows and small power rows support manual overrides. If the manual override field has a number, it replaces the auto-calculated hours. If the user clears the override field, the app returns to automatic calculation.
+
+Changing acres or efficiency clears the manual override for that row, because the app assumes the automatic formula should recalculate after the input basis changes.
+
+Mowing dollar formula:
+
+For each display key:
+
+rowTotal[key] = qtyUnit[key] * mowingDollars[key]
+
+totalOcc = sum of rowTotal for all display keys
+
+totalHours = sum of qtyUnit for all display keys
+
+totalAcres = sum of acres for deck keys only
+
+Adjustment formula:
+
+adjDollar = totalOcc * (adjPercent / 100)
+adjustedOcc = totalOcc + adjDollar
+
+Final mowing total:
+
+final = adjustedOcc * numOccurrences
+
+totalHoursAllOcc = totalHours * numOccurrences
+
+pricePerAcre = final / totalAcres, if totalAcres is greater than zero
+
+Example:
+
+If:
+
+- totalOcc = $1,000
+- adjustment = 10%
+- occurrences = 28
+
+adjDollar = 1000 * 0.10 = 100
+adjustedOcc = 1100
+final = 1100 * 28 = 30,800
+
+Mowing page behavior:
+
+MowingForm loads mowing tables from ServiceContext. If no mowing table exists, it creates Mowing1 using INITIAL_MOWING_DATA and writes it to context. Add Mowing Table creates Mowing2, Mowing3, etc. Save Mowing navigates back to /services. Reset replaces mowing tables with the default first table.
+
+Edging and Bed Maintenance are displayed on the Mowing page through ServiceTablesWrapper, so editing those services is also done from the mowing route.
+
+
+================================================================================
+7. EDGING SERVICE
+================================================================================
+
+Component: client/src/components/EdgingTable.jsx
+
+Purpose:
+Edging is a fixed table attached to the Mowing page. It estimates edging and blower hours.
+
+Default fields:
+
+- name: Edging
+- qtyUnit.EDGER: 0
+- qtyUnit.BLOWER: 0
+- unitPrice.EDGER: 55
+- unitPrice.BLOWER: 55
+- summary.numOccurrences: 0
+
+Formula:
+
+EDGER total = EDGER hours * EDGER unit price
+BLOWER total = BLOWER hours * BLOWER unit price
+
+sumHours = EDGER hours + BLOWER hours
+
+totalOccDollar = EDGER total + BLOWER total
+
+finalTotal = totalOccDollar * numOccurrences
+
+Example:
+
+If:
+
+- EDGER = 2.0 hours
+- BLOWER = 0.5 hours
+- EDGER rate = $55
+- BLOWER rate = $55
+- occurrences = 10
+
+EDGER total = 2.0 * 55 = 110
+BLOWER total = 0.5 * 55 = 27.50
+totalOccDollar = 137.50
+finalTotal = 137.50 * 10 = 1,375.00
+
+The Services summary row uses the same basic formula.
+
+
+================================================================================
+8. BED MAINTENANCE SERVICE
+================================================================================
+
+Component: client/src/components/BedMaintenanceTable.jsx
+
+Purpose:
+Bed Maintenance is a fixed table attached to the Mowing page. It estimates hand labor, backpack work, and Roundup.
+
+Default fields:
+
+- name: Bed Maintenance
+- qtyUnit.HAND: 0
+- qtyUnit.BACKPACK: 0
+- qtyUnit.ROUNDUP: 0
+- unitPrice.HAND: 55
+- unitPrice.BACKPACK: 55
+- unitPrice.ROUNDUP: 50
+- summary.numOccurrences: 0
+
+Formula:
+
+HAND total = HAND qty * HAND unit price
+BACKPACK total = BACKPACK qty * BACKPACK unit price
+ROUNDUP total = ROUNDUP qty * ROUNDUP unit price
+
+hours per occurrence = HAND + BACKPACK + ROUNDUP
+
+dollars per occurrence = HAND total + BACKPACK total + ROUNDUP total
+
+finalTotal = dollars per occurrence * numOccurrences
+
+Example:
+
+If:
+
+- HAND = 3.0
+- BACKPACK = 1.0
+- ROUNDUP = 0.5
+- rates are 55, 55, and 50
+- occurrences = 12
+
+HAND total = 3.0 * 55 = 165
+BACKPACK total = 1.0 * 55 = 55
+ROUNDUP total = 0.5 * 50 = 25
+dollars per occurrence = 245
+finalTotal = 245 * 12 = 2,940
+
+
+================================================================================
+9. MULCHING SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/MulchingForm.jsx
+- Page/table: client/src/components/Mulching/MulchingPage.jsx
+- Defaults: client/src/components/Mulching/mulchingDefaults.js
+- Calculations: client/src/components/Mulching/mulchingCalculations.js
+- Rates: client/src/components/Mulching/MulchingRatesPage.jsx
+
+Purpose:
+Mulching estimates mulch material, labor hours, small power/helper hours, loader hours, and total price. It supports multiple mulching tables.
+
+Mulching sections:
+
+- common: Hand - Common Areas - Sq/ft
+- homes: Hand - Homes - # of Homes
+- trees: Trees - # of Trees
+- finn: Finn - Sq/ft
+
+Each section has three areas:
+
+- area1
+- area2
+- area3
+
+Default dollar rates:
+
+- MISC: 52
+- HAND: 52
+- FINN: 97
+- SM_PWR: 57
+- HELPER: 52
+- LOADER: 88
+- MULCH: 31.22
+
+Default hand efficiency values:
+
+- Slowest: 1.05
+- Slow: 1.15
+- Average: 1.25
+- Fast: 1.35
+- Fastest: 1.45
+
+These represent mulch yards per hour for hand mulching areas.
+
+Default tree ring sizes:
+
+- Dia - 3': 3 feet
+- Dia - 4': 4 feet
+- Dia - 5': 5 feet
+- Dia - 6': 6 feet
+
+Default tree efficiency:
+
+- Slowest: 0.4
+- Slow: 0.5
+- Average: 0.55
+- Fast: 0.6
+- Fastest: 0.7
+
+Default depths:
+
+- Feather: 0.5 inch
+- 1": 1 inch
+- 1.5": 1.5 inches
+- 2": 2 inches
+
+Default small power man-hour factors:
+
+- Minimum: 22
+- Less: 20
+- Average: 18
+- More: 16
+- Copious: 14
+
+Default proximity factors:
+
+- Close: 1
+- Nearby: 1.1
+- Moderate: 1.2
+- Far: 1.3
+- Farthest: 1.4
+
+Default Finn efficiency:
+
+- Finn Slowest: 4
+- Finn Slow: 4.5
+- Finn Avg: 5
+- Finn Fast: 5.5
+- Finn Fastest: 6
+
+Default Finn helper factors:
+
+- Little: 0.75
+- Less: 0.9
+- Average: 1
+- More Help: 1.1
+- Copious: 1.25
+
+Mulch yard formula from square feet:
+
+mulchYards = ((sqft * coveragePercent / 100) * (depthInches / 12)) / 27
+
+The result is rounded to one decimal place.
+
+Explanation:
+
+- sqft is the area to cover
+- coveragePercent controls partial coverage
+- depthInches / 12 converts inches to feet
+- dividing by 27 converts cubic feet to cubic yards
+
+Example:
+
+If:
+
+- sqft = 10,000
+- coverage = 100%
+- depth = 1 inch
+
+mulchYards = (10000 * 1.0 * (1 / 12)) / 27
+mulchYards = 833.33 / 27
+mulchYards = 30.86, rounded to 30.9 yards
+
+Common hand area formula:
+
+mulch = mulchYardsFromSqft(sqft, coverage, depth)
+hours = (mulch / handEfficiency) * proximity
+
+Example:
+
+If:
+
+- mulch = 30.9 yards
+- hand efficiency = Average = 1.25 yards/hour
+- proximity = Moderate = 1.2
+
+hours = (30.9 / 1.25) * 1.2 = 29.664
+rounded to 29.66 hours
+
+Homes formula:
+
+For homes, total square feet is:
+
+totalSqft = sqftEach * count
+
+Then the common hand area formula is used with totalSqft.
+
+Tree formula:
+
+For trees:
+
+sqft = qty * pi * (diameter / 2)^2
+mulch = mulchYardsFromSqft(sqft, 100, treeDepth)
+hours = mulch / treeEfficiency
+
+Example:
+
+If:
+
+- qty = 10 trees
+- diameter = 4 feet
+- depth = 1 inch
+- tree efficiency = Average = 0.55 yards/hour
+
+sqft per tree = pi * 2^2 = 12.566
+sqft total = 125.66
+mulch = (125.66 * (1/12)) / 27 = 0.388 yards, rounded to 0.4
+hours = 0.4 / 0.55 = 0.73 hours
+
+Finn formula:
+
+Finn areas use the same mulch yard formula but use Finn depth and Finn efficiency.
+
+hours = mulch / finnEfficiency
+
+Extra hours by section:
+
+For non-Finn sections:
+
+extraHours = areaHours / smPowerManHoursRate
+
+For Finn section:
+
+extraHours = areaHours * finnHelperFactor
+
+Loader hours:
+
+The section has a loaderHours field, but the code treats it as loaderDays. It calculates actual loader hours as:
+
+if loaderDays == 0:
+  loaderHours = 0
+else:
+  loaderHours = (8 * loaderDays) + 2
+
+The result is rounded to two decimals.
+
+Example:
+
+loaderDays = 1
+loaderHours = 8 * 1 + 2 = 10
+
+loaderDays = 0.5
+loaderHours = 8 * 0.5 + 2 = 6
+
+Section hours per occurrence:
+
+hoursPerOcc = miscHours + areaHours + extraHours + loaderHours
+
+Section row totals:
+
+MISC = miscHours * MISC dollar rate
+area1 = area1.hours * laborRate
+area2 = area2.hours * laborRate
+area3 = area3.hours * laborRate
+SM_PWR or HELPER = extraHours * matching rate
+LOADER = loaderHours * LOADER rate
+MULCH = mulchYards * MULCH rate
+
+For Finn sections, laborRate is FINN. For all other sections, laborRate is HAND.
+
+Section total occurrence price:
+
+totalOcc = sum of all section row totals
+
+Section price per yard:
+
+pricePerYard = totalOcc / mulchYards, if mulchYards > 0
+
+Full mulching table totals:
+
+occurrences = data.occurrences
+
+totalOcc = sum(section.totalOcc for common, homes, trees, finn)
+
+hoursPerOcc = sum(section.hoursPerOcc for common, homes, trees, finn)
+
+mulchYards = sum(section.mulchYards for common, homes, trees, finn)
+
+totalPrice = totalOcc * occurrences
+
+totalHours = hoursPerOcc * occurrences
+
+pricePerYard = totalOcc / mulchYards, if mulchYards > 0
+
+
+================================================================================
+10. PRUNING SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/Pruning/PruningForm.jsx
+- Table: client/src/components/Pruning/PruningTable.jsx
+- Defaults: client/src/components/Pruning/pruningDefaults.js
+- Calculations: client/src/components/Pruning/pruningCalculations.js
+- Rates: client/src/components/Pruning/PruningRatesPage.jsx
+
+Purpose:
+Pruning estimates labor and equipment dollars by occurrence. It supports multiple pruning tables.
+
+Default pruning keys:
+
+- MISC
+- HAND
+- SHEARS
+- CLEANUP
+- CHAINSAW
+
+Default unit prices:
+
+- MISC: 51
+- HAND: 51
+- SHEARS: 55
+- CLEANUP: 51
+- CHAINSAW: 62
+
+Formula:
+
+hoursPerOcc = MISC qty + HAND qty + SHEARS qty + CLEANUP qty + CHAINSAW qty
+
+For each key:
+
+rowTotals[key] = qty[key] * rate[key]
+
+dollarsPerOcc = sum(rowTotals)
+
+finalTotal = dollarsPerOcc * occurrences
+
+Rates are built from:
+
+DEFAULT_PRUNING_RATES
+then saved table unitPrice
+then overrideRates from global pruningRates
+
+Later values override earlier values.
+
+Example:
+
+If:
+
+- HAND = 4 hours at $51
+- SHEARS = 2 hours at $55
+- CHAINSAW = 1 hour at $62
+- MISC and CLEANUP = 0
+- occurrences = 3
+
+HAND total = 4 * 51 = 204
+SHEARS total = 2 * 55 = 110
+CHAINSAW total = 1 * 62 = 62
+dollarsPerOcc = 376
+finalTotal = 376 * 3 = 1,128
+
+
+================================================================================
+11. FALL CLEANUP / LEAVES SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/LeavesForm.jsx
+- Defaults: client/src/components/Leaves/leavesDefaults.js
+- Calculations: client/src/components/Leaves/leavesCalculations.js
+- Rates: client/src/components/Leaves/LeavesRatesPage.jsx
+
+Purpose:
+Fall Cleanup estimates cleanup labor/equipment from acres, property type, and number of occurrences. It is stored as currentServices.leaves.
+
+Visible service name default:
+
+- Fall Cleanup
+
+Keys:
+
+- MISC
+- HAND
+- BLOWER
+- LEAF_TRUCK
+
+Default unit prices:
+
+- MISC: 52
+- HAND: 52
+- BLOWER: 57
+- LEAF_TRUCK: 88
+
+Property type rate factors:
+
+Open space/Light Cleanup:
+
+- HAND: 0.5
+- BLOWER: 3.5
+- LEAF_TRUCK: 0.75
+
+Lightly Wooded Community:
+
+- HAND: 0.75
+- BLOWER: 5.5
+- LEAF_TRUCK: 1
+
+Moderately Wooded Community:
+
+- HAND: 1
+- BLOWER: 6
+- LEAF_TRUCK: 1.25
+
+Heavily Wooded:
+
+- HAND: 1.25
+- BLOWER: 6.5
+- LEAF_TRUCK: 1.5
+
+Occurrence multipliers:
+
+- 1 occurrence: 1
+- 2 occurrences: 1.05
+- 3 occurrences: 1.1
+- 4 occurrences: 1.2
+
+The app clamps the multiplier key between 1 and 4 by rounding occurrences, then min/max clamping it. For example, 5 occurrences still uses multiplier key 4.
+
+Fall cleanup hour formula:
+
+For HAND, BLOWER, and LEAF_TRUCK:
+
+qtyUnit[key] = roundToQuarter((acres * propertyRate[key] / occurrences) * occurrenceMultiplier)
+
+MISC is manually entered from merged.qtyUnit.MISC.
+
+The app only calculates HAND/BLOWER/LEAF_TRUCK if acres > 0 and occurrences > 0.
+
+Example:
+
+If:
+
+- acres = 10
+- property type = Moderately Wooded Community
+- occurrences = 2
+- occurrence multiplier for 2 = 1.05
+
+HAND per occurrence:
+
+(10 * 1 / 2) * 1.05 = 5.25 hours
+
+BLOWER per occurrence:
+
+(10 * 6 / 2) * 1.05 = 31.5 hours
+
+LEAF_TRUCK per occurrence:
+
+(10 * 1.25 / 2) * 1.05 = 6.5625, rounded to 6.5 or 6.5 depending nearest-quarter rounding
+
+Dollars:
+
+rowTotals[key] = qtyUnit[key] * unitPrice[key]
+
+hoursPerOcc = MISC + HAND + BLOWER + LEAF_TRUCK
+
+dollarsPerOcc = sum(rowTotals)
+
+final = dollarsPerOcc * occurrences
+
+totalHours = hoursPerOcc * occurrences
+
+
+================================================================================
+12. SPRING CLEANUP SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/SpringCleanupForm.jsx
+- Defaults: client/src/components/SpringCleanup/springCleanupDefaults.js
+- Calculations: client/src/components/SpringCleanup/springCleanupCalculations.js
+
+Purpose:
+Spring Cleanup is a group of fixed cleanup-related tables plus optional extra tables. It is stored as currentServices.springCleanup.
+
+Configured tables:
+
+1. Spring Clean Up
+2. Spring Bed Cut Out
+3. Bed Pre-M
+4. Bed Fertilizer
+
+Default extra table type:
+
+- bedFertilizer
+
+Table definitions:
+
+Spring Clean Up keys:
+
+- MISC
+- HAND
+- BLOWER
+- SM_PWR
+- LEAF_TRUCK
+
+All are hour keys. No material keys.
+
+Rates:
+
+- MISC: 52
+- HAND: 52
+- BLOWER: 57
+- SM_PWR: 57
+- LEAF_TRUCK: 88
+
+Spring Bed Cut Out keys:
+
+- MISC
+- HAND
+- EDGER
+- SM_PWR
+- TRUCKSTER
+
+All are hour keys. No material keys.
+
+Rates:
+
+- MISC: 52
+- HAND: 52
+- EDGER: 57
+- SM_PWR: 57
+- TRUCKSTER: 109
+
+Bed Pre-M keys:
+
+- MISC
+- TRUCKSTER
+- HAND
+- BED_FERT
+- REGALSTAR
+
+Hour keys:
+
+- MISC
+- TRUCKSTER
+- HAND
+
+Material keys:
+
+- BED_FERT
+- REGALSTAR
+
+Rates:
+
+- MISC: 52
+- TRUCKSTER: 109
+- HAND: 52
+- BED_FERT: 109.28
+- REGALSTAR: 185.78
+
+Bed Fertilizer keys:
+
+- MISC
+- TRUCKSTER
+- HAND
+- BED_FERT
+- REGALSTAR
+
+Hour keys:
+
+- MISC
+- TRUCKSTER
+- HAND
+
+Material keys:
+
+- BED_FERT
+- REGALSTAR
+
+Rates:
+
+- MISC: 52
+- TRUCKSTER: 109
+- HAND: 52
+- BED_FERT: 109.28
+- REGALSTAR: 185.78
+
+Spring cleanup table formula:
+
+For each key in the table definition:
+
+rowTotals[key] = qty[key] * unitPrice[key]
+
+hoursPerOcc = sum qty[key] for hourKeys only
+
+dollarsPerOcc = sum rowTotals for all keys
+
+totalMat = sum rowTotals for materialKeys only
+
+occurrences = table.occurrences
+
+totalDollars = dollarsPerOcc * occurrences
+
+totalHours = hoursPerOcc * occurrences
+
+Example for Bed Pre-M:
+
+If:
+
+- MISC = 1 hour at $52
+- TRUCKSTER = 2 hours at $109
+- HAND = 3 hours at $52
+- BED_FERT = 4 bags at $109.28
+- REGALSTAR = 1 bag at $185.78
+- occurrences = 2
+
+row totals:
+
+MISC = 52
+TRUCKSTER = 218
+HAND = 156
+BED_FERT = 437.12
+REGALSTAR = 185.78
+
+dollarsPerOcc = 1,048.90
+hoursPerOcc = 1 + 2 + 3 = 6
+totalMat = 437.12 + 185.78 = 622.90
+totalDollars = 1,048.90 * 2 = 2,097.80
+totalHours = 6 * 2 = 12
+
+Full Spring Cleanup total:
+
+computeSpringCleanupTotals merges saved data with defaults, calculates every configured table, calculates extra tables, then sums:
+
+totalDollars = sum(totalDollars for all normal and extra tables)
+
+totalHours = sum(totalHours for all normal and extra tables)
+
+The Services page creates one summary row for each Spring Cleanup table that has occurrences greater than zero.
+
+
+================================================================================
+13. TURF APPLICATION SERVICE
+================================================================================
+
+Components and files:
+
+- Form wrapper: client/src/components/TurfAppForm.jsx
+- Real form: client/src/components/TurfApp/TurfAppForm.jsx
+- Table: client/src/components/TurfApp/TurfAppTable.jsx
+- Defaults: client/src/components/TurfApp/turfAppDefaults.js
+- Calculations: client/src/components/TurfApp/turfAppCalculations.js
+- Rates: client/src/components/TurfApp/TurfAppRatesPage.jsx
+
+Purpose:
+Turf Application estimates chemical/fertilizer material, equipment labor, hand labor, and total dollars per occurrence and across occurrences. It supports multiple turf application tables.
+
+Labor keys:
+
+- MISC
+- TRUCKSTER
+- ZMAX
+- HAND
+
+Material keys:
+
+- BARRICADE
+- TRIMEC
+- MERIT
+- FERTILIZER
+- OTHER_MATERIAL
+
+Display keys are all labor keys followed by all material keys.
+
+Default dollar rates:
+
+- MISC: 52
+- TRUCKSTER: 109
+- ZMAX: 104
+- HAND: 59
+- BARRICADE: 1.75
+- TRIMEC: 49.18
+- MERIT: 2.73
+- FERTILIZER: 30.6
+- OTHER_MATERIAL: 0
+
+Area type splits:
+
+Choose Area Type:
+
+- truckster: 0
+- zmax: 0
+- hand: 0
+
+Open Field/All Truckster:
+
+- truckster: 1
+- zmax: 0
+- hand: 0
+
+Homes w/ Open Space:
+
+- truckster: 0.55
+- zmax: 0.45
+- hand: 0.05
+
+Homes w/ Small Open Space:
+
+- truckster: 0.33
+- zmax: 0.67
+- hand: 0.05
+
+All Z Spray:
+
+- truckster: 0
+- zmax: 1
+- hand: 0.05
+
+Acres per hour:
+
+- TRUCKSTER: 1.3
+- ZMAX: 0.5
+
+Hand factors:
+
+- None: 0
+- Minimal: 0.1
+- Medium: 0.2
+- Substantial: 0.3
+
+Material amounts:
+
+- BARRICADE yes: 24 oz per acre
+- BARRICADE no: 0
+- TRIMEC yes: 0.5 gallons per acre
+- TRIMEC no: 0
+- MERIT yes: 24 oz per acre
+- MERIT no: 0
+
+Fertilizer options:
+
+- 18%N at 0.5lbs: $30.60, 2.42 bags/acre
+- 18%N at 0.75lbs: $30.60, 3.63 bags/acre
+- 18%N at 1lb: $30.60, 4.83 bags/acre
+- 25%N at 0.5lbs: $33.88, 1.74 bags/acre
+- 25%N at 0.75lbs: $33.88, 2.61 bags/acre
+- 25%N at 1lb: $33.88, 3.48 bags/acre
+- 46%N at 0.5lbs: $31.69, 0.95 bags/acre
+- 46%N at .75lbs: $31.69, 1.42 bags/acre
+- 46%N at 1lb: $31.69, 1.89 bags/acre
+- 46%N at 1.5lb: $31.69, 2.84 bags/acre
+- 46%N at 2lb: $31.69, 3.78 bags/acre
+
+Equipment multiples:
+
+Fertilizer multiples:
+
+- TRUCKSTER normalApps: 1.8, fertOnly: 0.7
+- ZMAX normalApps: 1.8, fertOnly: 0.7
+- HAND normalApps: 1.7, fertOnly: 0.8
+
+Broadleaf-only multiples:
+
+- TRUCKSTER: 1.2
+- ZMAX: 1.2
+- HAND: 1.2
+
+Material quantity formulas:
+
+BARRICADE = acres * 24 if addPreM is true, otherwise 0
+
+TRIMEC = acres * 0.5 if addBroadleaf is true, otherwise 0
+
+MERIT = acres * 24 if addGrub is true, otherwise 0
+
+FERTILIZER = acres * selectedFertilizer.bagsPerAcre if addGranularFert is true, otherwise 0
+
+OTHER_MATERIAL is manually entered.
+
+MISC is manually entered.
+
+Base equipment hour formulas:
+
+trucksterBase = (acres * areaType.truckster) / TRUCKSTER acresPerHour
+
+zmaxBase = (acres * areaType.zmax) / ZMAX acresPerHour
+
+handBase = acres * selectedHandFactor
+
+Equipment adjustment logic:
+
+The app determines whether normal application materials are present:
+
+normalApps = BARRICADE + TRIMEC + MERIT > 0
+
+It checks whether fertilizer exists:
+
+hasFert = FERTILIZER != 0
+
+It checks broadleaf-only condition:
+
+broadleafOnly = addBroadleaf is true and BARRICADE + MERIT + FERTILIZER == 0
+
+Then each equipment base is adjusted:
+
+If hasFert:
+
+- If normalApps is true:
+  result = base + base * fertilizerMultiple.normalApps
+
+- If normalApps is false:
+  result = base * fertilizerMultiple.fertOnly
+
+Else if broadleafOnly:
+
+- result = base * broadleafMultiple
+
+Else:
+
+- result = base
+
+The result is rounded to the nearest quarter hour.
+
+Manual overrides:
+
+TRUCKSTER, ZMAX, and HAND support manual overrides. If a manual override exists, it replaces the calculated equipment hour value.
+
+Example:
+
+Assume:
+
+- acres = 20
+- propertyType = Homes w/ Open Space
+- addPreM = true
+- addGranularFert = false
+- TRUCKSTER acres/hour = 1.3
+- ZMAX acres/hour = 0.5
+- area split truckster 0.55, zmax 0.45
+
+BARRICADE = 20 * 24 = 480 oz
+TRIMEC = 0
+MERIT = 0
+FERTILIZER = 0
+
+trucksterBase = (20 * 0.55) / 1.3 = 8.4615, rounded to 8.5
+zmaxBase = (20 * 0.45) / 0.5 = 18.0
+
+If no fertilizer and not broadleaf-only, those bases remain the calculated hours.
+
+Dollar formula:
+
+rowTotals[key] = qtyUnit[key] * dollars[key]
+
+FERTILIZER uses the selected fertilizer option price, not just the default FERTILIZER dollar rate.
+
+OTHER_MATERIAL uses data.otherMaterialUnitPrice if present.
+
+hoursPerOcc = MISC + TRUCKSTER + ZMAX + HAND
+
+totalMat = BARRICADE total + TRIMEC total + MERIT total + FERTILIZER total + OTHER_MATERIAL total
+
+totalOcc = sum(rowTotals for all display keys)
+
+final = totalOcc * numOccurrences
+
+totalHoursAllOcc = hoursPerOcc * numOccurrences
+
+pricePerAcre = final / acres, if acres > 0
+
+
+================================================================================
+14. FLOWERS SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/FlowersForm.jsx
+- Table: client/src/components/Flowers/FlowersTable.jsx
+- Defaults: client/src/components/Flowers/flowersDefaults.js
+- Calculations: client/src/components/Flowers/flowersCalculations.js
+
+Purpose:
+Flowers estimates labor and flower material dollars. It supports multiple flower tables.
+
+Keys:
+
+- MISC
+- HAND
+- SM_PWR
+- POTS
+- KALE
+- MUMS
+- FLATS
+
+Labor keys:
+
+- MISC
+- HAND
+- SM_PWR
+
+Material/other keys:
+
+- POTS
+- KALE
+- MUMS
+- FLATS
+
+Default labels:
+
+- MISC: Misc
+- HAND: Hand
+- SM_PWR: SM Pwr
+- POTS: Pots
+- KALE: Kale
+- MUMS: Mums
+- FLATS: Flats
+
+Default unit prices:
+
+- MISC: 51
+- HAND: 51
+- SM_PWR: 55
+- POTS: 15
+- KALE: 15
+- MUMS: 15
+- FLATS: 35
+
+The material labels POTS, KALE, MUMS, and FLATS can be customized through customLabels.
+
+Formula:
+
+rowTotals[key] = qty[key] * unitPrice[key]
+
+qtyPerOcc = MISC qty + HAND qty + SM_PWR qty
+
+dollarsPerOcc = sum(rowTotals for all keys)
+
+totalDollars = dollarsPerOcc * occurrences
+
+Example:
+
+If:
+
+- HAND = 2 hours at $51
+- SM_PWR = 1 hour at $55
+- POTS = 10 at $15
+- FLATS = 2 at $35
+- occurrences = 1
+
+HAND total = 102
+SM_PWR total = 55
+POTS total = 150
+FLATS total = 70
+dollarsPerOcc = 377
+totalDollars = 377
+
+
+================================================================================
+15. EXTRAS SERVICE
+================================================================================
+
+Components and files:
+
+- Form: client/src/components/ExtrasForm.jsx
+- Table: client/src/components/Extras/ExtrasTable.jsx
+- Defaults: client/src/components/Extras/extrasDefaults.js
+- Calculations: client/src/components/Extras/extrasCalculations.js
+
+Purpose:
+Extras estimates miscellaneous labor, specialty work, and material. It supports multiple extras tables.
+
+Keys:
+
+- MISC
+- HAND
+- SM_PWR
+- SPECIALTY
+- MATERIAL
+
+Labor keys:
+
+- MISC
+- HAND
+- SM_PWR
+
+Default labels:
+
+- MISC: Misc
+- HAND: Hand
+- SM_PWR: SM Pwr
+- SPECIALTY: Specialty
+- MATERIAL: Material
+
+Default unit prices:
+
+- MISC: 51
+- HAND: 51
+- SM_PWR: 55
+- SPECIALTY: 60
+- MATERIAL: 0
+
+SPECIALTY and MATERIAL labels can be customized.
+
+Formula:
+
+rowTotals[key] = qty[key] * unitPrice[key]
+
+qtyPerOcc = MISC qty + HAND qty + SM_PWR qty
+
+dollarsPerOcc = sum(rowTotals for all keys)
+
+totalDollars = dollarsPerOcc * occurrences
+
+Example:
+
+If:
+
+- HAND = 2 at $51
+- SPECIALTY = 3 at $60
+- MATERIAL = 1 at $250
+- occurrences = 2
+
+HAND total = 102
+SPECIALTY total = 180
+MATERIAL total = 250
+dollarsPerOcc = 532
+totalDollars = 532 * 2 = 1,064
+
+
+================================================================================
+16. RATE PAGES AND RATE LOGIC
+================================================================================
+
+Rate pages allow default calculation assumptions to be edited in browser state.
+
+Known rate pages:
+
+- Mowing Rates
+- Mulching Rates
+- Pruning Rates
+- Turf App Rates
+- Leaves Rates
+
+Rates are not saved to the server immediately when edited. Instead, rate edits update currentRates in ServiceContext. When the project is saved, currentRates is saved with the project under services.__rates.
+
+This design means rate edits are project-specific after save/load. A loaded project can restore the rate assumptions that were active when the project was saved.
+
+Mowing rates control:
+
+- mowingFactors.acresPerHour
+- mowingFactors.smPwrEfficiency
+- mowingFactors.smPwrAllocation
+- mowingDollars
+
+Mulching rates control:
+
+- dollars
+- handEfficiency
+- treeRingSize
+- treeEfficiency
+- treeDepth
+- depthInches
+- smPowerManHours
+- loaderManHours
+- proximity
+- finnEfficiency
+- finnDepth
+- finnHelper
+
+Pruning rates control:
+
+- MISC
+- HAND
+- SHEARS
+- CLEANUP
+- CHAINSAW
+
+Turf App rates control:
+
+- dollars
+- areaTypes
+- acresPerHour
+- handFactors
+- materialAmounts
+- fertilizerOptions
+- equipmentMultiples
+
+Leaves rates control:
+
+- unitPrice
+- propertyTypes
+- occurrenceMultipliers
+
+
+================================================================================
+17. SERVER AND DATABASE LOGIC
+================================================================================
+
+Server file: server/server.js
+
+The server uses Express, CORS, JSON parsing, and better-sqlite3.
+
+The server opens:
+
+./database.db
+
+When run from the server directory, this refers to server/database.db.
+
+Database tables:
+
+projects:
+
+- id INTEGER PRIMARY KEY AUTOINCREMENT
+- project_name TEXT
+- date TEXT
+- acres REAL
+
+services:
+
+- id INTEGER PRIMARY KEY AUTOINCREMENT
+- project_id INTEGER
+- service_type TEXT
+- data TEXT
+
+rates:
+
+- id INTEGER PRIMARY KEY AUTOINCREMENT
+- name TEXT UNIQUE
+- value REAL
+- category TEXT
+- unit TEXT
+
+The rates table is initialized with a small set of defaults if it is empty. Most current app rate behavior, however, is stored in frontend currentRates and saved per project under services.__rates.
+
+API endpoints:
+
+GET /projects?limit=10
+
+Returns the latest projects ordered by id descending. It also fetches service rows for those projects and attaches a services object to each project.
+
+GET /project/:id
+
+Returns one project and all service data for that project.
+
+DELETE /project/:id
+
+Deletes service rows for that project, then deletes the project row.
+
+PUT /project/:id
+
+Updates an existing project and replaces all service rows with the submitted current service data. This is a full replace, not a partial patch.
+
+POST /project
+
+Creates a new project row and inserts service rows for every submitted service key.
+
+GET /rates
+
+Returns rows from the server rates table.
+
+PUT /rates/:name
+
+Updates a single row in the server rates table by name. This route is separate from the frontend project-specific rate system.
+
+Mowing-rate API:
+
+The server also creates a mowing_rates table and exposes:
+
+- GET /api/mowing-rates
+- PUT /api/mowing-rates
+
+This table has id = 1 and columns:
+
+- rate_72
+- rate_60
+- rate_48
+- rate_trimmer
+- rate_blower
+- rate_rotary
+
+Current frontend code mainly uses ServiceContext rates. This older/server mowing-rate API may exist for compatibility or previous workflows.
+
+
+================================================================================
+18. SAVE AND LOAD DATA MODEL
+================================================================================
+
+When saving, the Services page sends:
+
+{
+  project: {
+    id,
+    projectName,
+    date,
+    acres
+  },
+  services: {
+    mowing,
+    edging,
+    bedMaintenance,
+    mulching,
+    pruning,
+    leaves,
+    springCleanup,
+    turfApp,
+    flowers,
+    extras,
+    __rates
+  }
+}
+
+The server stores each services object entry as a row:
+
+- project_id = saved project id
+- service_type = key name, such as mowing or __rates
+- data = JSON.stringify(value)
+
+On load, the server reads service rows, parses JSON, and returns:
+
+{
+  success: true,
+  project,
+  services
+}
+
+ProjectForm normalizes loaded services. Array services are converted to arrays if necessary. Single-object services are converted to null if they are empty objects.
+
+The most important consequence is that the database does not store every service field as columns. Service detail is stored as JSON, which makes it flexible for many different service shapes.
+
+
+================================================================================
+19. SERVICE SUMMARY ROW RULES
+================================================================================
+
+The Services page does not blindly list every service in currentServices. It builds summaryRows with service-specific rules.
+
+Mowing:
+
+- Loops through currentServices.mowing array.
+- Computes mowing preview totals.
+- Includes the row only when numOccurrences > 0.
+- Price / Occ = adjustedOcc.
+- Total = final.
+
+Mulching:
+
+- Loops through currentServices.mulching array.
+- Computes mulching totals.
+- Includes the row only when occurrences > 0.
+- Price / Occ = totalOcc.
+- Total = totalPrice.
+
+Pruning:
+
+- Loops through currentServices.pruning array.
+- Computes pruning totals.
+- Includes the row only when occurrences > 0.
+- Price / Occ = pricePerOcc.
+- Total = totalDollar in preview logic.
+
+Edging:
+
+- Reads currentServices.edging.
+- Includes row only when numOccurrences > 0.
+- Price / Occ = EDGER/BLOWER dollars per occurrence.
+- Total = final total.
+
+Bed Maintenance:
+
+- Reads currentServices.bedMaintenance.
+- Includes row only when numOccurrences > 0.
+- Price / Occ = dollars per occurrence.
+- Total = final total.
+
+Leaves / Fall Cleanup:
+
+- Reads currentServices.leaves.
+- Includes row only when occurrences > 0.
+- Price / Occ = dollarsPerOcc.
+- Total = final.
+
+Spring Cleanup:
+
+- Creates separate summary rows for each configured table with occurrences > 0.
+- Creates separate summary rows for extra tables with occurrences > 0.
+- Price / Occ = dollarsPerOcc.
+- Total = totalDollars.
+
+Turf App:
+
+- Loops through currentServices.turfApp array.
+- Includes row only when numOccurrences > 0.
+- Price / Occ = totalOcc.
+- Total = final.
+
+Flowers:
+
+- Loops through currentServices.flowers array.
+- Includes row only when occurrences > 0.
+- Price / Occ = dollarsPerOcc.
+- Total = totalDollars.
+
+Extras:
+
+- Loops through currentServices.extras array.
+- Includes row only when occurrences > 0.
+- Price / Occ = dollarsPerOcc.
+- Total = totalDollars.
+
+
+================================================================================
+20. ROUNDING RULES
+================================================================================
+
+Mowing:
+
+- Deck hours are rounded to nearest quarter hour.
+- Small power hours are rounded to nearest quarter hour.
+- Manual overrides are rounded to nearest quarter hour when entered.
+
+Leaves:
+
+- HAND, BLOWER, and LEAF_TRUCK quantities are rounded to nearest quarter hour.
+
+Turf App:
+
+- TRUCKSTER, ZMAX, and HAND auto quantities are rounded to nearest quarter hour.
+
+Mulching:
+
+- Mulch yards are rounded to one decimal place.
+- Most hour calculations are rounded to two decimals.
+- Loader day conversion is rounded to two decimals.
+
+Currency:
+
+The formatCurrency helper uses toLocaleString with:
+
+- en-US locale
+- USD currency
+- minimumFractionDigits: 2
+- maximumFractionDigits: 2
+
+This means all displayed currency should show two decimals.
+
+
+================================================================================
+21. PRACTICAL EXAMPLE: BUILDING A PROJECT
+================================================================================
+
+Example project:
+
+- Project Name: North Ridge HOA
+- Date: 2026-07-05
+- Turf Acres: 25
+
+Step 1: Main Page
+
+The user enters those fields and clicks Create. The browser stores:
+
+{
+  id: null,
+  projectName: "North Ridge HOA",
+  date: "2026-07-05",
+  acres: "25"
+}
+
+The app resets services and rates because it is a new project, then navigates to /services.
+
+Step 2: Add mowing
+
+The user clicks Mowing. If no mowing table exists, MowingForm creates Mowing1.
+
+Suppose the user enters:
+
+- 72-area1 acres: 10
+- 72-area1 efficiency: OPEN_LAWN
+- occurrences: 28
+
+Using 72 OPEN_LAWN rate 1.3 acres/hour:
+
+raw hours = 10 / 1.3 = 7.692
+rounded hours = 7.75
+
+If 72-area1 dollar rate is $51:
+
+row total = 7.75 * 51 = 395.25
+
+That row contributes $395.25 per occurrence before adjustments.
+
+Step 3: Add Fall Cleanup
+
+The user clicks Fall Cleanup and enters:
+
+- acres: 25
+- property type: Moderately Wooded Community
+- occurrences: 2
+
+HAND per occurrence:
+
+(25 * 1 / 2) * 1.05 = 13.125, rounded to 13.25
+
+BLOWER per occurrence:
+
+(25 * 6 / 2) * 1.05 = 78.75
+
+LEAF_TRUCK per occurrence:
+
+(25 * 1.25 / 2) * 1.05 = 16.40625, rounded to 16.5
+
+Using rates HAND 52, BLOWER 57, LEAF_TRUCK 88:
+
+HAND dollars = 13.25 * 52 = 689.00
+BLOWER dollars = 78.75 * 57 = 4,488.75
+LEAF_TRUCK dollars = 16.5 * 88 = 1,452.00
+
+dollarsPerOcc = 6,629.75
+final = 6,629.75 * 2 = 13,259.50
+
+Step 4: Services page
+
+The Services page lists each service row. Estimated Project Total is the sum of all service row totals.
+
+Step 5: Save Project
+
+Clicking Save Project sends the project and services to the server. The server inserts or updates the project and stores each service as JSON.
+
+
+================================================================================
+22. IMPORTANT IMPLEMENTATION NOTES
+================================================================================
+
+1. The app is state-first.
+
+Most edits happen in React state first. The server database changes only after Save Project.
+
+2. localStorage stores the current project shell.
+
+The key project stores project name, date, acres, and id. It does not store all service details. Service details live in ServiceContext while the page is open and in the server database after saving.
+
+3. ServiceContext is the working estimate.
+
+Every service page reads from and writes to ServiceContext. The Services page reads the same context to build the summary.
+
+4. Saved projects store services as JSON.
+
+The server database does not have separate columns for every service field. This makes the system flexible but means database-level reporting requires JSON parsing.
+
+5. Rates can be project-specific.
+
+Rates are saved under __rates with the project. Loading the project restores those rates.
+
+6. Some services are multi-table and some are single-table.
+
+This affects how delete, edit, summary, and save logic works.
+
+7. Occurrences usually control whether a service appears in the Services summary.
+
+If a service has data but zero occurrences, it usually will not appear in the preview table.
+
+8. Editing from the preview table goes to the correct service page.
+
+The app does not currently jump to a specific table within a multi-table service page.
+
+9. PDF output is a summary, not a full worksheet export.
+
+The PDF contains the Services preview summary, not every detailed input row from each service page.
+
+10. The app uses /shearon as its browser basename.
+
+If deployed behind Apache or another reverse proxy, routes should be served under /shearon.
+
+
+================================================================================
+23. QUICK FORMULA REFERENCE
+================================================================================
+
+Mowing deck hours:
+
+hours = roundQuarter(acres / acresPerHourRate)
+
+Mowing small power hours:
+
+hours = roundQuarter(
+  deck72Hours * alloc72 * efficiencyFactor
++ deck60Hours * alloc60 * efficiencyFactor
++ deck48Hours * alloc48 * efficiencyFactor
+)
+
+Mowing adjusted occurrence price:
+
+adjustedOcc = totalOcc + totalOcc * adjustmentPercent / 100
+
+Mowing final:
+
+final = adjustedOcc * occurrences
+
+Edging final:
+
+final = ((edgerHours * edgerRate) + (blowerHours * blowerRate)) * occurrences
+
+Bed Maintenance final:
+
+final = ((hand * handRate) + (backpack * backpackRate) + (roundup * roundupRate)) * occurrences
+
+Mulch yards:
+
+mulchYards = ((sqft * coveragePercent / 100) * (depthInches / 12)) / 27
+
+Mulching hand hours:
+
+hours = (mulchYards / efficiency) * proximity
+
+Mulching loader hours:
+
+loaderHours = loaderDays == 0 ? 0 : (8 * loaderDays) + 2
+
+Mulching final:
+
+final = totalOcc * occurrences
+
+Pruning final:
+
+final = sum(qty[key] * rate[key]) * occurrences
+
+Leaves qty by labor/equipment key:
+
+qtyUnit[key] = roundQuarter((acres * propertyRate[key] / occurrences) * occurrenceMultiplier)
+
+Leaves final:
+
+final = dollarsPerOcc * occurrences
+
+Spring cleanup table final:
+
+final = sum(qty[key] * unitPrice[key]) * occurrences
+
+Turf material quantities:
+
+BARRICADE = acres * 24 if pre-m is selected
+TRIMEC = acres * 0.5 if broadleaf is selected
+MERIT = acres * 24 if grub is selected
+FERTILIZER = acres * selectedBagsPerAcre if granular fertilizer is selected
+
+Turf equipment base hours:
+
+trucksterBase = acres * areaType.truckster / trucksterAcresPerHour
+zmaxBase = acres * areaType.zmax / zmaxAcresPerHour
+handBase = acres * handFactor
+
+Turf final:
+
+final = totalOcc * occurrences
+
+Flowers final:
+
+final = sum(qty[key] * unitPrice[key]) * occurrences
+
+Extras final:
+
+final = sum(qty[key] * unitPrice[key]) * occurrences
+
+
+================================================================================
+24. MAINTENANCE CHECKLIST FOR FUTURE CHANGES
+================================================================================
+
+When adding or changing a service:
+
+1. Decide whether it is a single service or multi-table service.
+2. Add defaults for its starting shape.
+3. Add merge logic so old saved data can load safely.
+4. Add calculation functions that accept saved data and rates.
+5. Add or update its form component.
+6. Add the service to ServiceContext defaults.
+7. Add the service to resetServices.
+8. Add summaryRows logic in ServicesPage.
+9. Add delete logic in ServicesPage.
+10. Add edit route logic in ServicesPage.
+11. Add save/load normalization in ProjectForm if needed.
+12. Add total calculation in getProjectContractTotal if it should show in recent project cards.
+13. Decide whether rates should be part of currentRates and saved under __rates.
+14. Run npm run build.
+15. Test creating a new project, editing the service, saving, loading, deleting, and summary display.
+
+When changing a formula:
+
+1. Update the calculation module first.
+2. Verify the service form uses that calculation module.
+3. Verify ServicesPage preview uses the same calculation logic or matches it exactly.
+4. Verify ProjectForm recent-project total also uses the same formula.
+5. Add examples to this manual so future users understand the change.
+
+When changing labels only:
+
+1. Change visible labels only.
+2. Avoid renaming saved object fields unless migration is planned.
+3. Remember that field names like acres may remain internally even when labels say Turf Acres.
+
+
+================================================================================
+25. APACHE, PUBLIC URL PATHS, AND EXPRESS SERVER BEHAVIOR
+================================================================================
+
+This section explains how the app is intended to be reached from the public web server and how requests move through Apache, React, and Express.
+
+Apache configuration file in this repository:
+
+- client/robby-ssl.conf
+
+Important note:
+This file is a copy of an Apache SSL virtual host configuration. The active Apache configuration on the server may be installed elsewhere, commonly under /etc/apache2/sites-available or /etc/apache2/sites-enabled. The file in this repo documents the intended proxy setup.
+
+Apache virtual host:
+
+The config defines:
+
+<VirtualHost *:443>
+  ServerName robby.hopto.org
+</VirtualHost>
+
+This means it handles HTTPS traffic on port 443 for robby.hopto.org.
+
+SSL certificates:
+
+The config uses Let's Encrypt certificate files:
+
+- SSLCertificateFile /etc/letsencrypt/live/robby.hopto.org/fullchain.pem
+- SSLCertificateKeyFile /etc/letsencrypt/live/robby.hopto.org/privkey.pem
+
+It also includes:
+
+- /etc/letsencrypt/options-ssl-apache.conf
+
+That file is generated/managed by Certbot and contains recommended SSL settings.
+
+Apache paths and proxies:
+
+1. /api
+
+Configured as:
+
+ProxyPass /api http://localhost:5000/
+ProxyPassReverse /api http://localhost:5000/
+
+Meaning:
+
+A public request to:
+
+https://robby.hopto.org/api/anything
+
+is proxied by Apache to:
+
+http://localhost:5000/anything
+
+Important detail:
+Because the ProxyPass target ends with a slash, Apache strips the /api prefix when forwarding. For example:
+
+Public URL:
+
+https://robby.hopto.org/api/projects?limit=10
+
+Forwarded to Express as:
+
+http://localhost:5000/projects?limit=10
+
+This matches the Express route app.get('/projects').
+
+2. /static
+
+Configured as:
+
+ProxyPass /static http://localhost:3000/static
+ProxyPassReverse /static http://localhost:3000/static
+
+Meaning:
+
+Public static bundle requests under /static are forwarded to the React dev server on port 3000. This is useful when running Create React App in development mode.
+
+3. /ws
+
+Configured as:
+
+ProxyPass /ws ws://localhost:3000/ws
+ProxyPassReverse /ws ws://localhost:3000/ws
+
+Meaning:
+
+Webpack development server websocket traffic is forwarded to port 3000. This supports live reload / hot reload behavior when the React dev server is running.
+
+4. /shearon
+
+Configured as:
+
+ProxyPass /shearon http://localhost:3000/
+ProxyPassReverse /shearon http://localhost:3000/
+
+Meaning:
+
+Public app requests under:
+
+https://robby.hopto.org/shearon
+
+are forwarded to the React dev server at:
+
+http://localhost:3000/
+
+The React app itself is also configured with BrowserRouter basename='/shearon'. This is important because React Router expects the public app base path to be /shearon.
+
+How /shearon works with React Router:
+
+The browser sees:
+
+https://robby.hopto.org/shearon/services
+
+Apache sends that request to the frontend server. React Router sees the basename /shearon and treats the internal route as:
+
+/services
+
+That route renders ServicesPage.
+
+Why /bidsheet returned 404 during testing:
+
+The repo's Apache config contains proxy rules for /api, /static, /ws, and /shearon. It does not contain a ProxyPass rule for /bidsheet. Therefore, when a browser requests:
+
+https://robby.hopto.org/bidsheet
+
+Apache has no matching proxy rule in this config and returns its own 404 Not Found page.
+
+Even if a backend process exists on another port, Apache must be configured to map a public path to it. A process listening on localhost:5001 is not automatically public unless Apache or another reverse proxy forwards traffic to it.
+
+How Express functions on this server:
+
+Express is the Node.js backend application in server/server.js. It listens on port 5000:
+
+app.listen(5000, () => console.log('Server running on port 5000'))
+
+Express is not serving the React pages. React pages are handled by the frontend build/dev server and Apache. Express handles API requests and database work.
+
+Express middleware:
+
+1. trust proxy
+
+app.set('trust proxy', true)
+
+This tells Express it may be running behind a reverse proxy such as Apache. In proxy deployments, request IP/protocol information can come from proxy headers.
+
+2. CORS
+
+The server enables CORS with:
+
+origin: '*'
+methods: GET, POST, DELETE, PUT
+allowedHeaders: Content-Type
+
+This allows browser clients to call the API from different origins. In this app, Apache may proxy API calls under /api, but permissive CORS also allows direct local or network calls during development.
+
+3. JSON body parsing
+
+app.use(express.json())
+
+This parses JSON request bodies for POST and PUT endpoints. For example, Save Project sends a JSON object containing project and services.
+
+Express database startup:
+
+The server opens SQLite using:
+
+new Database('./database.db')
+
+Because this is a relative path, it depends on the working directory used when starting the Node process. If the process is started from the server folder, it uses:
+
+server/database.db
+
+If it is started from another directory, './database.db' may point somewhere else. The intended database file in this project is server/database.db.
+
+Express table creation:
+
+On startup, Express creates tables if they do not already exist:
+
+- projects
+- services
+- rates
+- mowing_rates
+
+This means the app can start with an empty SQLite file and create the required schema automatically.
+
+Express project API behavior:
+
+GET /projects?limit=10
+
+- Reads the latest project rows from projects.
+- Fetches service rows for those project ids.
+- Parses each service data JSON string.
+- Groups services under each project.
+- Returns { success: true, projects }.
+
+GET /project/:id
+
+- Looks up one project by id.
+- If missing, returns { success: false, error: 'Project not found' }.
+- Fetches all services for that project.
+- Parses each service JSON string.
+- Returns { success: true, project, services }.
+
+POST /project
+
+- Receives a new project and services payload.
+- Inserts project_name, date, and acres into projects.
+- Uses the new project id to insert each service key into services.
+- Each service object is stored as JSON text.
+- Returns { success: true, projectId }.
+
+PUT /project/:id
+
+- Receives an existing project and services payload.
+- Updates the project row.
+- Deletes all previous service rows for that project.
+- Inserts all submitted current service rows fresh.
+- Returns { success: true, projectId }.
+
+This is a full replacement save. It does not merge individual service rows with old service rows. Whatever the client submits becomes the saved project state.
+
+DELETE /project/:id
+
+- Deletes rows in services for the project id.
+- Deletes the project row.
+- Returns { success: true }.
+
+Express rates behavior:
+
+GET /rates
+
+- Reads rows from the rates table.
+- Returns name, value, category, and unit.
+
+PUT /rates/:name
+
+- Expects a JSON body like { "value": 55 }.
+- Requires value to be a number.
+- Updates the matching row by name.
+- Returns 404 if no rate by that name exists.
+
+Express mowing_rates API:
+
+On startup, Express creates a mowing_rates table with one row, id = 1. It exposes:
+
+GET /api/mowing-rates
+
+- Returns the single mowing_rates row.
+
+PUT /api/mowing-rates
+
+- Updates rate_72, rate_60, rate_48, rate_trimmer, rate_blower, and rate_rotary.
+
+Important distinction:
+The main React app currently stores rich rate structures in ServiceContext and saves them with projects under __rates. The server /rates and /api/mowing-rates endpoints are separate backend rate mechanisms. They may be older or supplemental APIs and are not the same thing as the project-specific __rates object saved from ServicesPage.
+
+How a Save Project request flows through the server:
+
+1. User clicks Save Project on /shearon/services.
+2. React builds a JSON payload with project and services.
+3. Browser sends POST /project or PUT /project/:id if using the proxy-less local setup, or it can send through Apache as /api/project depending on API_URL/deployment setup.
+4. Apache, when using /api, forwards the request to localhost:5000.
+5. Express receives the request.
+6. express.json() parses the JSON body.
+7. Express writes project data to SQLite.
+8. Express writes each service as JSON text in the services table.
+9. Express returns success JSON.
+10. React updates localStorage and navigates back to the main page.
+
+Common deployment checks:
+
+- Apache must be listening on 443 for HTTPS.
+- The SSL certificate paths must exist and be valid.
+- The React frontend must be available on the port Apache proxies to, currently localhost:3000 for the provided config.
+- Express must be running on localhost:5000.
+- If using /api public paths, React API calls must target /api or otherwise be routed correctly.
+- If a new public path such as /bidsheet is desired, Apache needs an explicit ProxyPass or static alias for it.
+- If running a production React build instead of npm start, Apache config should be adjusted to serve the build files or proxy to the production static server.
+
+PM2 / process manager context:
+
+The server has been observed running Node processes through PM2 names such as shearon-app and bidsheet-app. PM2 keeps Node processes alive after terminal sessions end. Apache is separate from PM2: Apache handles public HTTP/HTTPS traffic, while PM2 keeps backend/frontend Node processes running on local ports.
+
+Typical relationship:
+
+Browser -> Apache HTTPS virtual host -> local Node process
+
+Examples:
+
+Browser requests /shearon -> Apache -> localhost:3000 -> React app
+Browser requests /api/projects -> Apache -> localhost:5000/projects -> Express -> SQLite
+
+If Apache returns 404, the request usually did not match an Apache route/proxy rule.
+
+If Apache returns 502/503 or cannot connect, the proxy rule may exist but the target local process may not be running.
+
+If Express returns JSON error, Apache routing probably worked, but the backend route or database operation failed.
+
+
+END OF MANUAL

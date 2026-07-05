@@ -339,7 +339,7 @@ export default function ProjectForm() {
             </label>
 
             <label>
-              <span>Acres</span>
+              <span>Turf Acres</span>
               <input
                 type="number"
                 name="acres"

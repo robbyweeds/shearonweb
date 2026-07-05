@@ -52,8 +52,10 @@ export default function FlowersTable({ tableId, onDelete }) {
 
   const labelFor = (key) => localData.customLabels[key] || FLOWER_LABELS[key];
 
+  const unitFor = (key) => (["POTS", "KALE", "MUMS", "FLATS"].includes(key) ? "Unit" : "HRS");
+
   return (
-    <div style={{ fontSize: "0.75rem", maxWidth: "560px" }}>
+    <div style={{ fontSize: "0.75rem", maxWidth: "100%" }}>
       <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", marginBottom: "4px" }}>
         <input
           value={localData.name}
@@ -68,12 +70,13 @@ export default function FlowersTable({ tableId, onDelete }) {
         )}
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", tableLayout: "fixed" }}>
+      <div style={tableScroller}>
+      <table style={tableStyle}>
         <thead>
           <tr>
             {FLOWER_KEYS.map((key) => (
               <th key={key} style={th}>
-                {key === "POTS" || key === "FLATS" ? (
+                {["POTS", "KALE", "MUMS", "FLATS"].includes(key) ? (
                   <input
                     value={labelFor(key)}
                     onChange={(e) => updateCustomLabel(key, e.target.value)}
@@ -85,7 +88,8 @@ export default function FlowersTable({ tableId, onDelete }) {
                 )}
               </th>
             ))}
-            <th style={th}>Occ</th>
+            <th style={summaryLabelStyle}>HR/OCC</th>
+            <th style={summaryValueStyle}>{totals.qtyPerOcc.toFixed(2)}</th>
           </tr>
         </thead>
 
@@ -99,6 +103,7 @@ export default function FlowersTable({ tableId, onDelete }) {
                   onChange={(e) => updateQty(key, e.target.value)}
                   style={input}
                 />
+                <div style={unitLabel}>{unitFor(key)}</div>
                 <div style={priceBox}>
                   <input
                     type="number"
@@ -109,8 +114,16 @@ export default function FlowersTable({ tableId, onDelete }) {
                 </div>
               </td>
             ))}
+            <td style={summaryLabelStyle}>$/Occ</td>
+            <td style={summaryValueStyle}>{formatCurrency(totals.dollarsPerOcc)}</td>
+          </tr>
 
-            <td style={td}>
+          <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
+            {FLOWER_KEYS.map((key) => (
+              <td key={key} style={td}>{formatCurrency(totals.rowTotals[key])}</td>
+            ))}
+            <td style={summaryLabelStyle}># Occ</td>
+            <td style={inputCellStyle}>
               <input
                 type="number"
                 value={localData.occurrences}
@@ -123,19 +136,29 @@ export default function FlowersTable({ tableId, onDelete }) {
           </tr>
 
           <tr>
-            <td colSpan={6} style={{ textAlign: "center", padding: "4px" }}>
-              <strong>
-                Qty/Occ: {totals.qtyPerOcc.toFixed(2)} &nbsp;|&nbsp;
-                $/Occ: {formatCurrency(totals.dollarsPerOcc)} &nbsp;|&nbsp;
-                Total: {formatCurrency(totals.totalDollars)}
-              </strong>
-            </td>
+            <td colSpan={FLOWER_KEYS.length} style={{ border: "none" }}></td>
+            <td style={summaryLabelStyle}>Total $</td>
+            <td style={summaryValueStyle}>{formatCurrency(totals.totalDollars)}</td>
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
+
+const tableScroller = {
+  maxWidth: "100%",
+  overflowX: "auto",
+};
+
+const tableStyle = {
+  background: "#fff",
+  borderCollapse: "collapse",
+  minWidth: "760px",
+  tableLayout: "fixed",
+  width: "100%",
+};
 
 const th = {
   padding: "2px",
@@ -148,6 +171,26 @@ const td = {
   padding: "2px",
   textAlign: "center",
   verticalAlign: "top",
+};
+
+const summaryLabelStyle = {
+  ...td,
+  background: "#f3f3f3",
+  fontWeight: 700,
+  verticalAlign: "middle",
+};
+
+const summaryValueStyle = {
+  ...td,
+  background: "#eef",
+  fontWeight: 700,
+  verticalAlign: "middle",
+};
+
+const inputCellStyle = {
+  ...td,
+  background: "#fff59d",
+  verticalAlign: "middle",
 };
 
 const input = {
@@ -166,6 +209,14 @@ const headerInput = {
 
 const priceBox = {
   marginTop: "2px",
+};
+
+const unitLabel = {
+  color: "#555",
+  fontSize: "0.58rem",
+  fontWeight: 700,
+  lineHeight: 1.1,
+  marginTop: "1px",
 };
 
 const priceInput = {

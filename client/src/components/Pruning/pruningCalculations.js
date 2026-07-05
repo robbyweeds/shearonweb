@@ -32,16 +32,18 @@ export function computePruningTotals(data = {}, overrideRates) {
     return sum + q;
   }, 0);
 
-  // Dollars per occurrence = Σ (hours * rate)
-  const dollarsPerOcc = keys.reduce((sum, k) => {
-    const q = Number(qty[k]) || 0;
-    const r = Number(rates[k]) || 0;
-    return sum + q * r;
-  }, 0);
+  const rowTotals = {};
+  keys.forEach((k) => {
+    rowTotals[k] = (Number(qty[k]) || 0) * (Number(rates[k]) || 0);
+  });
+
+  // Dollars per occurrence = sum of all column totals
+  const dollarsPerOcc = keys.reduce((sum, k) => sum + Number(rowTotals[k] || 0), 0);
 
   const finalTotal = dollarsPerOcc * occ;
 
   return {
+    rowTotals,
     hoursPerOcc,
     dollarsPerOcc,
     finalTotal,

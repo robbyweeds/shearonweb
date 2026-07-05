@@ -420,7 +420,7 @@ export default function MulchingPage({ tableId, onDelete }) {
           <th style={sectionHeaderStyle(meta)}>{meta.equipmentLabel}</th>
           <th style={sectionHeaderStyle(meta)}>Loader Days</th>
           <th style={sectionHeaderStyle(meta)}>MULCH</th>
-          <th style={summaryLabelStyle}>HRS/OCC</th>
+          <th style={summaryLabelStyle}>HR/OCC</th>
           <th style={summaryValueStyle}>{sectionTotals.hoursPerOcc.toFixed(1)}</th>
         </tr>
         {renderAreaInputRow(sectionKey)}

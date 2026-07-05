@@ -166,7 +166,7 @@ export default function BedMaintenanceTable() {
             />
           </td>
 
-          <td>HRS/OCC</td>
+          <td>HR/OCC</td>
           <td style={{ background: "#eef" }}>{sum.toFixed(2)}</td>
         </tr>
 

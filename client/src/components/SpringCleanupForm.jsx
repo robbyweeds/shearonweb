@@ -127,7 +127,7 @@ export default function SpringCleanupForm() {
               {definition.keys.map((key) => (
                 <th key={key} style={cellStyle}>{definition.labels[key]}</th>
               ))}
-              <th style={summaryLabelStyle}>HRS/OCC</th>
+              <th style={summaryLabelStyle}>HR/OCC</th>
               <th style={summaryValueStyle}>{totals.hoursPerOcc.toFixed(1)}</th>
             </tr>
           </thead>
@@ -223,7 +223,7 @@ export default function SpringCleanupForm() {
 
       <div className="service-actions-stack">
         <button onClick={addBedFertilizerTable} type="button">
-          Add Bed Fertilizer Table
+          Add Table
         </button>
 
         <div className="service-page-actions pruning-page-actions">

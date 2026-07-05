@@ -75,7 +75,7 @@ export default function LeavesRatesPage() {
 
   const handleSaveRates = () => {
     updateRates("leavesRates", rates);
-    alert("Leaves Rates Updated!");
+    alert("Fall Cleanup Rates Updated!");
   };
 
   const handleResetToDefault = () => {
@@ -84,7 +84,7 @@ export default function LeavesRatesPage() {
 
   return (
     <div style={{ padding: "2rem", maxWidth: "980px", margin: "0 auto" }}>
-      <h2>Edit Leaves Rates</h2>
+      <h2>Edit Fall Cleanup Rates</h2>
 
       <h3>Dollar Rates</h3>
       <table border="1" style={{ ...tableStyle, maxWidth: "520px" }}>
@@ -146,7 +146,7 @@ export default function LeavesRatesPage() {
 
       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1rem" }}>
         <button className="save-project-button" onClick={handleSaveRates} type="button">
-          Save Leaves Rates
+          Save Fall Cleanup Rates
         </button>
         <button className="danger-button" onClick={handleResetToDefault} type="button">
           Reset to Default

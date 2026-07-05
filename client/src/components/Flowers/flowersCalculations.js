@@ -1,4 +1,4 @@
-import { FLOWER_KEYS, INITIAL_FLOWERS_TABLE } from "./flowersDefaults";
+import { FLOWER_KEYS, FLOWER_LABOR_KEYS, INITIAL_FLOWERS_TABLE } from "./flowersDefaults";
 
 export function mergeFlowersTable(data = {}) {
   return {
@@ -31,7 +31,7 @@ export function computeFlowersTotals(data = {}) {
     rowTotals[key] = Number(merged.qty[key] || 0) * Number(merged.unitPrice[key] || 0);
   });
 
-  const qtyPerOcc = FLOWER_KEYS.reduce(
+  const qtyPerOcc = FLOWER_LABOR_KEYS.reduce(
     (sum, key) => sum + Number(merged.qty[key] || 0),
     0
   );

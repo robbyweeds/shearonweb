@@ -47,6 +47,14 @@ export default function PruningTable({ tableId, onDelete }) {
   });
 
   const appliedRates = currentRates?.pruningRates || localData.unitPrice;
+  const totals = computePruningTotals(
+    {
+      qty: localData.qty,
+      unitPrice: appliedRates,
+      occurrences: localData.occurrences,
+    },
+    appliedRates
+  );
 
   // ------------- RECALCULATE -------------
   useEffect(() => {
@@ -93,7 +101,7 @@ export default function PruningTable({ tableId, onDelete }) {
     }));
 
   return (
-    <div style={{ fontSize: "0.75rem", maxWidth: "480px" }}>
+    <div style={{ fontSize: "0.75rem", maxWidth: "660px" }}>
       <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", marginBottom: "4px" }}>
         <input
           value={localData.name}
@@ -129,7 +137,8 @@ export default function PruningTable({ tableId, onDelete }) {
             <th style={th}>Shears</th>
             <th style={th}>Cleanup</th>
             <th style={th}>Chainsaw</th>
-            <th style={th}>Occ</th>
+            <th style={summaryLabelStyle}>HR/OCC</th>
+            <th style={summaryValueStyle}>{totals.hoursPerOcc.toFixed(2)}</th>
           </tr>
         </thead>
 
@@ -143,6 +152,7 @@ export default function PruningTable({ tableId, onDelete }) {
                   onChange={(e) => updateQty(k, e.target.value)}
                   style={input}
                 />
+                <div style={unitLabel}>HRS</div>
                 <div style={priceBox}>
                   <input
                     type="number"
@@ -153,8 +163,16 @@ export default function PruningTable({ tableId, onDelete }) {
                 </div>
               </td>
             ))}
+            <td style={summaryLabelStyle}>$/Occ</td>
+            <td style={summaryValueStyle}>{formatCurrency(totals.dollarsPerOcc)}</td>
+          </tr>
 
-            <td style={td}>
+          <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
+            {["MISC", "HAND", "SHEARS", "CLEANUP", "CHAINSAW"].map((k) => (
+              <td key={k} style={td}>{formatCurrency(totals.rowTotals[k])}</td>
+            ))}
+            <td style={summaryLabelStyle}># Occ</td>
+            <td style={inputCellStyle}>
               <input
                 type="number"
                 value={localData.occurrences}
@@ -170,12 +188,9 @@ export default function PruningTable({ tableId, onDelete }) {
           </tr>
 
           <tr>
-            <td colSpan={6} style={{ textAlign: "center", padding: "4px" }}>
-              <strong>
-                Hrs/Occ: {localData.summary.hoursPerOcc.toFixed(2)} &nbsp;|&nbsp;
-                Total: {formatCurrency(localData.summary.totalDollars)}
-              </strong>
-            </td>
+            <td colSpan={5} style={{ border: "none" }}></td>
+            <td style={summaryLabelStyle}>Total $</td>
+            <td style={summaryValueStyle}>{formatCurrency(totals.finalTotal)}</td>
           </tr>
         </tbody>
       </table>
@@ -196,6 +211,26 @@ const td = {
   verticalAlign: "top",
 };
 
+const summaryLabelStyle = {
+  ...td,
+  background: "#f3f3f3",
+  fontWeight: 700,
+  verticalAlign: "middle",
+};
+
+const summaryValueStyle = {
+  ...td,
+  background: "#eef",
+  fontWeight: 700,
+  verticalAlign: "middle",
+};
+
+const inputCellStyle = {
+  ...td,
+  background: "#fff59d",
+  verticalAlign: "middle",
+};
+
 const input = {
   width: "48px",
   padding: "2px",
@@ -205,6 +240,14 @@ const input = {
 
 const priceBox = {
   marginTop: "2px",
+};
+
+const unitLabel = {
+  color: "#555",
+  fontSize: "0.58rem",
+  fontWeight: 700,
+  lineHeight: 1.1,
+  marginTop: "1px",
 };
 
 const priceInput = {

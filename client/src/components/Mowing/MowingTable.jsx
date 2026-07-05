@@ -262,7 +262,7 @@ export default function MowingTable({ tableId, onDelete }) {
             <th style={cellStyle}>BLOWER</th>
             <th style={cellStyle}>ROTARY</th>
             <th style={cellStyle}>Specialty</th>
-            <th style={summaryLabelStyle}>HRS/OCC:</th>
+            <th style={summaryLabelStyle}>HR/OCC:</th>
             <th style={summaryValueStyle}>{totals.totalHours.toFixed(2)}</th>
           </tr>
         </thead>

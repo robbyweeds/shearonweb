@@ -29,20 +29,174 @@ const formatShortDate = (value) => {
   return `${month}/${day}/${year.slice(-2)}`;
 };
 
-const escapeHtml = (value) =>
-  String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
 const filenameSafe = (value) =>
   String(value || "service-preview")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "service-preview";
+
+const pdfText = (value) =>
+  String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+
+const truncatePdfText = (value, maxLength) => {
+  const text = String(value ?? "");
+  if (text.length <= maxLength) return text;
+  return text.slice(0, Math.max(0, maxLength - 3)) + "...";
+};
+
+const addPdfText = (commands, text, x, y, size = 10) => {
+  commands.push(
+    "BT /F1 " + size + " Tf 1 0 0 1 " + x + " " + y + " Tm (" + pdfText(text) + ") Tj ET"
+  );
+};
+
+const addPdfLine = (commands, x1, y1, x2, y2) => {
+  commands.push("0.82 0.85 0.82 RG " + x1 + " " + y1 + " m " + x2 + " " + y2 + " l S");
+};
+
+const byteLength = (value) => new TextEncoder().encode(value).length;
+
+const downloadPdfBlob = async (blob, filename) => {
+  if (window.showSaveFilePicker) {
+    try {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [
+          {
+            description: "PDF file",
+            accept: { "application/pdf": [".pdf"] },
+          },
+        ],
+      });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      console.error(err);
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const buildServicePreviewPdf = ({ propertyName, date, acres, summaryRows, projectTotal }) => {
+  const rows = summaryRows.map((row) => ({
+    label: truncatePdfText(row.label, 34),
+    occ: String(row.occ ?? ""),
+    pricePerOcc: row.pricePerOcc === null ? "-" : money(row.pricePerOcc),
+    total: row.total === null ? "-" : money(row.total),
+  }));
+  const pages = [];
+  let rowIndex = 0;
+
+  while (rowIndex < rows.length || pages.length === 0) {
+    const commands = ["0.09 0.13 0.11 rg"];
+    let y;
+
+    if (pages.length === 0) {
+      addPdfText(commands, propertyName, 40, 746, 24);
+      addPdfText(commands, "Property Name", 40, 712, 8);
+      addPdfText(commands, propertyName, 40, 696, 12);
+      addPdfText(commands, "Acres", 244, 712, 8);
+      addPdfText(commands, acres, 244, 696, 12);
+      addPdfText(commands, "Date", 408, 712, 8);
+      addPdfText(commands, date, 408, 696, 12);
+      addPdfLine(commands, 40, 676, 572, 676);
+      y = 642;
+    } else {
+      addPdfText(commands, propertyName + " Service Preview", 40, 746, 18);
+      y = 712;
+    }
+
+    addPdfText(commands, "Service", 40, y, 9);
+    addPdfText(commands, "Occurrences", 314, y, 9);
+    addPdfText(commands, "Price / Occ", 414, y, 9);
+    addPdfText(commands, "Total", 520, y, 9);
+    addPdfLine(commands, 40, y - 10, 572, y - 10);
+    y -= 34;
+
+    while (rowIndex < rows.length && y > 124) {
+      const row = rows[rowIndex];
+      addPdfText(commands, row.label, 40, y, 10);
+      addPdfText(commands, row.occ, 344, y, 10);
+      addPdfText(commands, row.pricePerOcc, 414, y, 10);
+      addPdfText(commands, row.total, 506, y, 10);
+      addPdfLine(commands, 40, y - 10, 572, y - 10);
+      y -= 24;
+      rowIndex += 1;
+    }
+
+    if (rowIndex >= rows.length) {
+      y -= 10;
+      addPdfText(commands, "Estimated Project Total", 40, y, 12);
+      addPdfText(commands, money(projectTotal), 506, y, 12);
+    }
+
+    pages.push(commands.join("\n"));
+  }
+
+  const objects = [];
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+
+  const kids = [];
+  pages.forEach((stream) => {
+    const contentObjectNumber = objects.length;
+    objects[contentObjectNumber] =
+      "<< /Length " + byteLength(stream) + " >>\nstream\n" + stream + "\nendstream";
+
+    const pageObjectNumber = objects.length;
+    objects[pageObjectNumber] =
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents " +
+      contentObjectNumber +
+      " 0 R /Resources << /Font << /F1 3 0 R >> >> >>";
+    kids.push(pageObjectNumber + " 0 R");
+  });
+
+  objects[2] = "<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + pages.length + " >>";
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+
+  for (let index = 1; index < objects.length; index += 1) {
+    offsets[index] = byteLength(pdf);
+    pdf += index + " 0 obj\n" + objects[index] + "\nendobj\n";
+  }
+
+  const xrefOffset = byteLength(pdf);
+  pdf += "xref\n0 " + objects.length + "\n0000000000 65535 f \n";
+
+  for (let index = 1; index < objects.length; index += 1) {
+    pdf += String(offsets[index]).padStart(10, "0") + " 00000 n \n";
+  }
+
+  pdf +=
+    "trailer\n<< /Size " +
+    objects.length +
+    " /Root 1 0 R >>\nstartxref\n" +
+    xrefOffset +
+    "\n%%EOF";
+
+  return new Blob([pdf], { type: "application/pdf" });
+};
 
 export default function ServicesPage() {
   const navigate = useNavigate();
@@ -229,6 +383,7 @@ export default function ServicesPage() {
         occ,
         pricePerOcc: totals.adjustedOcc,
         total: totals.final,
+        onEdit: () => navigate("/services/mowing"),
         onDelete: () => deleteMowing(entry.id),
       });
     });
@@ -246,6 +401,7 @@ export default function ServicesPage() {
         occ,
         pricePerOcc: calc.totalOcc,
         total: calc.totalPrice,
+        onEdit: () => navigate("/services/mulching"),
         onDelete: () => deleteMulching(entry.id),
       });
     });
@@ -260,6 +416,7 @@ export default function ServicesPage() {
         occ: calc.occ,
         pricePerOcc: calc.pricePerOcc,
         total: calc.totalDollar,
+        onEdit: () => navigate("/services/pruning"),
         onDelete: () => deletePruning(entry.id),
       });
     });
@@ -277,6 +434,7 @@ export default function ServicesPage() {
           occ: calc.occ,
           pricePerOcc: calc.pricePerOcc,
           total: calc.finalTotal,
+          onEdit: () => navigate("/services/mowing"),
           onDelete: deleteEdging,
         });
       }
@@ -295,6 +453,7 @@ export default function ServicesPage() {
           occ: calc.occ,
           pricePerOcc: calc.pricePerOcc,
           total: calc.finalTotal,
+          onEdit: () => navigate("/services/mowing"),
           onDelete: deleteBedMaintenance,
         });
       }
@@ -313,6 +472,7 @@ export default function ServicesPage() {
           occ,
           pricePerOcc: totals.dollarsPerOcc,
           total: totals.final,
+          onEdit: () => navigate("/services/leaves"),
           onDelete: deleteLeaves,
         });
       }
@@ -333,6 +493,7 @@ export default function ServicesPage() {
           occ,
           pricePerOcc: totals.dollarsPerOcc,
           total: totals.totalDollars,
+          onEdit: () => navigate("/services/spring-cleanup"),
           onDelete: deleteSpringCleanup,
         });
       });
@@ -349,6 +510,7 @@ export default function ServicesPage() {
           occ,
           pricePerOcc: totals.dollarsPerOcc,
           total: totals.totalDollars,
+          onEdit: () => navigate("/services/spring-cleanup"),
           onDelete: deleteSpringCleanup,
         });
       });
@@ -387,6 +549,7 @@ export default function ServicesPage() {
         occ,
         pricePerOcc: totals.totalOcc,
         total: totals.final,
+        onEdit: () => navigate("/services/turf-app"),
         onDelete: () => deleteTurfApp(entry.id),
       });
     });
@@ -410,6 +573,7 @@ export default function ServicesPage() {
         occ,
         pricePerOcc: totals.dollarsPerOcc,
         total: totals.totalDollars,
+        onEdit: () => navigate("/services/flowers"),
         onDelete: () => updateService(
           "flowers",
           (currentServices.flowers || []).filter((table) => table.id !== entry.id)
@@ -436,6 +600,7 @@ export default function ServicesPage() {
         occ,
         pricePerOcc: totals.dollarsPerOcc,
         total: totals.totalDollars,
+        onEdit: () => navigate("/services/extras"),
         onDelete: () => updateService(
           "extras",
           (currentServices.extras || []).filter((table) => table.id !== entry.id)
@@ -451,7 +616,7 @@ export default function ServicesPage() {
     0
   );
 
-  const handleDownloadPreview = () => {
+  const handleDownloadPreview = async () => {
     if (summaryRows.length === 0) {
       alert("Add a service before downloading the preview.");
       return;
@@ -460,118 +625,17 @@ export default function ServicesPage() {
     const propertyName = project.projectName || "New Project";
     const date = formatShortDate(project.date);
     const acres = project.acres || "Not set";
-    const rows = summaryRows
-      .map(
-        (row) => `
-          <tr>
-            <td>${escapeHtml(row.label)}</td>
-            <td>${escapeHtml(row.occ)}</td>
-            <td>${row.pricePerOcc === null ? "-" : escapeHtml(money(row.pricePerOcc))}</td>
-            <td>${row.total === null ? "-" : escapeHtml(money(row.total))}</td>
-          </tr>`
-      )
-      .join("");
-
-    const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(propertyName)} Service Preview</title>
-  <style>
-    body {
-      color: #17211b;
-      font-family: Arial, Helvetica, sans-serif;
-      margin: 40px;
-    }
-    h1 {
-      font-size: 28px;
-      margin: 0 0 16px;
-    }
-    .project-meta {
-      border-bottom: 2px solid #236b4a;
-      display: grid;
-      gap: 10px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      margin-bottom: 28px;
-      padding-bottom: 18px;
-    }
-    .project-meta span {
-      color: #66706a;
-      display: block;
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-    }
-    .project-meta strong {
-      font-size: 16px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-    th,
-    td {
-      border-bottom: 1px solid #d9dfd8;
-      padding: 12px 10px;
-      text-align: left;
-    }
-    th:not(:first-child),
-    td:not(:first-child) {
-      text-align: right;
-    }
-    th {
-      color: #66706a;
-      font-size: 12px;
-      text-transform: uppercase;
-    }
-    tfoot td {
-      border-bottom: 0;
-      font-weight: 700;
-    }
-    @media print {
-      body {
-        margin: 24px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <h1>${escapeHtml(propertyName)}</h1>
-  <section class="project-meta">
-    <div><span>Property Name</span><strong>${escapeHtml(propertyName)}</strong></div>
-    <div><span>Acres</span><strong>${escapeHtml(acres)}</strong></div>
-    <div><span>Date</span><strong>${escapeHtml(date)}</strong></div>
-  </section>
-  <table>
-    <thead>
-      <tr>
-        <th>Service</th>
-        <th>Occurrences</th>
-        <th>Price / Occ</th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="3">Estimated Project Total</td>
-        <td>${escapeHtml(money(projectTotal))}</td>
-      </tr>
-    </tfoot>
-  </table>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${filenameSafe(propertyName)}-service-preview.html`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    const pdfBlob = buildServicePreviewPdf({
+      propertyName,
+      date,
+      acres,
+      summaryRows,
+      projectTotal,
+    });
+    await downloadPdfBlob(
+      pdfBlob,
+      filenameSafe(propertyName) + "-service-preview.pdf"
+    );
   };
 
   const handleSaveProject = async () => {
@@ -657,7 +721,7 @@ export default function ServicesPage() {
           </div>
           <div>
             <label className="summary-field-label" htmlFor="project-acres">
-              Acres
+              Turf Acres
             </label>
             <input
               id="project-acres"
@@ -680,7 +744,7 @@ export default function ServicesPage() {
           <button onClick={() => navigate("/services/mowing")} type="button">Mowing</button>
           <button onClick={() => navigate("/services/mulching")} type="button">Mulching</button>
           <button onClick={() => navigate("/services/pruning")} type="button">Pruning</button>
-          <button onClick={() => navigate("/services/leaves")} type="button">Leaves</button>
+          <button onClick={() => navigate("/services/leaves")} type="button">Fall Cleanup</button>
           <button onClick={() => navigate("/services/spring-cleanup")} type="button">Spring Cleanup</button>
           <button onClick={() => navigate("/services/turf-app")} type="button">Turf App</button>
           <button onClick={() => navigate("/services/flowers")} type="button">Flowers</button>
@@ -698,7 +762,7 @@ export default function ServicesPage() {
                 onClick={handleDownloadPreview}
                 type="button"
               >
-                Download Chart
+                Download PDF
               </button>
             </div>
           </div>
@@ -725,9 +789,14 @@ export default function ServicesPage() {
                       <td>{row.pricePerOcc === null ? "-" : money(row.pricePerOcc)}</td>
                       <td>{row.total === null ? "-" : money(row.total)}</td>
                       <td>
-                        <button className="danger-button compact-button" onClick={row.onDelete} type="button">
-                          Remove
-                        </button>
+                        <div className="summary-row-actions">
+                          <button className="secondary-button compact-button" onClick={row.onEdit} type="button">
+                            Edit
+                          </button>
+                          <button className="danger-button compact-button" onClick={row.onDelete} type="button">
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -1,4 +1,5 @@
 export const EXTRA_KEYS = ["MISC", "HAND", "SM_PWR", "SPECIALTY", "MATERIAL"];
+export const EXTRA_LABOR_KEYS = ["MISC", "HAND", "SM_PWR"];
 
 export const EXTRA_LABELS = {
   MISC: "Misc",

@@ -80,7 +80,7 @@ export default function LeavesForm() {
               {LEAVES_KEYS.map((key) => (
                 <th key={key} colSpan={2} style={cellStyle}>{LEAVES_LABELS[key]}</th>
               ))}
-              <th style={summaryLabelStyle}>HRS/OCC</th>
+              <th style={summaryLabelStyle}>HR/OCC</th>
               <th style={summaryValueStyle}>{totals.hoursPerOcc.toFixed(1)}</th>
             </tr>
           </thead>
@@ -171,12 +171,12 @@ export default function LeavesForm() {
 
       <div className="service-actions-stack">
         <button className="secondary-button" onClick={() => navigate("/leaves-rates")} type="button">
-          Edit Leaves Rates
+          Edit Fall Cleanup Rates
         </button>
 
         <div className="service-page-actions pruning-page-actions">
           <button className="save-project-button" onClick={handleSave} type="button">
-            Save Leaves
+            Save Fall Cleanup
           </button>
           <button className="danger-button" onClick={handleReset} type="button">
             Reset

@@ -154,7 +154,7 @@ export default function EdgingTable() {
             />
           </td>
 
-          <td>HRS/OCC</td>
+          <td>HR/OCC</td>
           <td style={{ background: "#eef" }}>{sumHours.toFixed(2)}</td>
         </tr>
 

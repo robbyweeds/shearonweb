@@ -1,4 +1,4 @@
-import { EXTRA_KEYS, INITIAL_EXTRAS_TABLE } from "./extrasDefaults";
+import { EXTRA_KEYS, EXTRA_LABOR_KEYS, INITIAL_EXTRAS_TABLE } from "./extrasDefaults";
 
 export function mergeExtrasTable(data = {}) {
   return {
@@ -31,7 +31,7 @@ export function computeExtrasTotals(data = {}) {
     rowTotals[key] = Number(merged.qty[key] || 0) * Number(merged.unitPrice[key] || 0);
   });
 
-  const qtyPerOcc = EXTRA_KEYS.reduce(
+  const qtyPerOcc = EXTRA_LABOR_KEYS.reduce(
     (sum, key) => sum + Number(merged.qty[key] || 0),
     0
   );

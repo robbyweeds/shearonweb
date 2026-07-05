@@ -283,7 +283,7 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
                 )}
               </th>
             ))}
-            <th style={summaryLabelStyle}>HRS/OCC</th>
+            <th style={summaryLabelStyle}>HR/OCC</th>
             <th style={summaryValueStyle}>{totals.hoursPerOcc.toFixed(1)}</th>
           </tr>
         </thead>

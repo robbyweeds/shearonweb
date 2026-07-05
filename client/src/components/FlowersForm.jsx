@@ -59,7 +59,7 @@ export default function FlowersForm() {
   };
 
   return (
-    <div className="service-entry-page pruning-entry-page">
+    <div className="service-entry-page" style={{ maxWidth: "1040px", margin: "0 auto" }}>
       <h2 style={{ marginBottom: "1rem" }}>Flowers</h2>
 
       {tables.map((table, index) => (

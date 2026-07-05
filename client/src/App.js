@@ -1,7 +1,7 @@
 // App.js — FINAL UPDATED WITH PRUNING RATES
 
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { useLayoutEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 
 // Pages
 import ProjectForm from "./components/ProjectForm";
@@ -21,6 +21,17 @@ import MulchingRatesPage from "./components/Mulching/MulchingRatesPage";
 import PruningRatesPage from "./components/Pruning/PruningRatesPage";
 import TurfAppRatesPage from "./components/TurfApp/TurfAppRatesPage";
 import LeavesRatesPage from "./components/Leaves/LeavesRatesPage";
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pathname]);
+
+  return null;
+}
+
+
 
 function App() {
   const clearZeroNumberInput = (event) => {
@@ -35,6 +46,7 @@ function App() {
 
   return (
     <Router basename="/shearon">
+      <ScrollToTop />
       <div onFocusCapture={clearZeroNumberInput}>
         <Routes>
         <Route path="/" element={<ProjectForm />} />
