@@ -4,15 +4,11 @@
 
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { DEFAULT_TURF_APP_RATES } from "../components/TurfApp/turfAppDefaults";
+import { DEFAULT_LEAVES_RATES } from "../components/Leaves/leavesDefaults";
 
 const ServiceContext = createContext(null);
 
-export function ServiceProvider({ children }) {
-
-  // ----------------------------------------
-  // MOWING FACTORS (ALL DEFAULTS)
-  // ----------------------------------------
-  const DEFAULT_MOWING_FACTORS = {
+const DEFAULT_MOWING_FACTORS = {
     acresPerHour: {
       "72": {
         OBSTACLES: 0.65,
@@ -64,12 +60,9 @@ export function ServiceProvider({ children }) {
       TRIMMER: { "72": 0.1, "60": 0.2, "48": 0.75 },
       BLOWER: { "72": 0.1, "60": 0.2, "48": 0.75 },
     },
-  };
+};
 
-  // ----------------------------------------
-  // DOLLAR RATES
-  // ----------------------------------------
-  const DEFAULT_MOWING_DOLLARS = {
+const DEFAULT_MOWING_DOLLARS = {
     MISC_HRS: 61,
     "72-area1": 51,
     "72-area2": 61,
@@ -81,7 +74,9 @@ export function ServiceProvider({ children }) {
     BLOWER: 55,
     ROTARY: 55,
     "5111": 100,
-  };
+};
+
+export function ServiceProvider({ children }) {
 
   // ----------------------------------------
   // GLOBAL SERVICES STORAGE
@@ -95,8 +90,8 @@ export function ServiceProvider({ children }) {
     leaves: null,
     springCleanup: null,
     turfApp: [],
-    flowers: null,
-    extras: null,
+    flowers: [],
+    extras: [],
   });
 
   // ----------------------------------------
@@ -108,6 +103,7 @@ export function ServiceProvider({ children }) {
     mulchingRates: null,
     pruningRates: null,   // ✅ ADDED (supports PruningRatesPage)
     turfAppRates: DEFAULT_TURF_APP_RATES,
+    leavesRates: DEFAULT_LEAVES_RATES,
   });
 
   // ----------------------------------------
@@ -145,8 +141,8 @@ export function ServiceProvider({ children }) {
       leaves: null,
       springCleanup: null,
       turfApp: [],
-      flowers: null,
-      extras: null,
+      flowers: [],
+      extras: [],
     });
   }, []);
 
@@ -157,6 +153,7 @@ export function ServiceProvider({ children }) {
       mulchingRates: null,
       pruningRates: null,
       turfAppRates: DEFAULT_TURF_APP_RATES,
+      leavesRates: DEFAULT_LEAVES_RATES,
     });
   }, []);
 

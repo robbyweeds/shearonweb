@@ -37,6 +37,7 @@ export default function ServiceTablesWrapper() {
         }
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // runs once
 
   return (

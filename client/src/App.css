@@ -210,6 +210,24 @@ button:focus-visible {
   margin-bottom: 1rem;
 }
 
+.summary-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+button:disabled:hover {
+  box-shadow: none;
+}
+
 .section-heading span,
 .section-heading strong {
   font-size: 0.95rem;
@@ -276,7 +294,16 @@ button:focus-visible {
 }
 
 .pruning-page-actions {
-  margin-top: 1rem;
+  margin-top: 0;
+}
+
+.pruning-actions-stack,
+.service-actions-stack {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
 }
 
 .service-tool-row button,
@@ -379,6 +406,26 @@ button:focus-visible {
   margin-bottom: 1rem;
 }
 
+.editable-project-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.editable-project-title h1 {
+  margin: 0;
+}
+
+.editable-project-title input {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 900;
+  line-height: 1.05;
+  max-width: min(680px, 100%);
+  padding: 0.25rem 0.45rem;
+  width: 520px;
+}
+
 .summary-strip div {
   background: #f8faf8;
   border: 1px solid var(--line);
@@ -477,9 +524,14 @@ button:focus-visible {
     position: static;
   }
 
-  .services-header {
+  .services-header,
+  .section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .summary-heading-actions {
+    justify-content: flex-start;
   }
 }
 

@@ -105,7 +105,27 @@ app.get("/projects", (req, res) => {
       .prepare("SELECT * FROM projects ORDER BY id DESC LIMIT ?")
       .all(limit);
 
-    res.json({ success: true, projects: rows });
+    if (rows.length === 0) {
+      return res.json({ success: true, projects: [] });
+    }
+
+    const placeholders = rows.map(() => "?").join(",");
+    const services = db
+      .prepare(`SELECT project_id, service_type, data FROM services WHERE project_id IN (${placeholders})`)
+      .all(...rows.map((row) => row.id));
+
+    const servicesByProject = {};
+    services.forEach((service) => {
+      servicesByProject[service.project_id] = servicesByProject[service.project_id] || {};
+      servicesByProject[service.project_id][service.service_type] = JSON.parse(service.data);
+    });
+
+    const projects = rows.map((row) => ({
+      ...row,
+      services: servicesByProject[row.id] || {},
+    }));
+
+    res.json({ success: true, projects });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }

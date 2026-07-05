@@ -20,6 +20,7 @@ import MowingRatesPage from "./components/Mowing/MowingRatesPage";
 import MulchingRatesPage from "./components/Mulching/MulchingRatesPage";
 import PruningRatesPage from "./components/Pruning/PruningRatesPage";
 import TurfAppRatesPage from "./components/TurfApp/TurfAppRatesPage";
+import LeavesRatesPage from "./components/Leaves/LeavesRatesPage";
 
 function App() {
   const clearZeroNumberInput = (event) => {
@@ -54,6 +55,7 @@ function App() {
         <Route path="/mulching-rates" element={<MulchingRatesPage />} />
         <Route path="/pruning-rates" element={<PruningRatesPage />} />
         <Route path="/turf-app-rates" element={<TurfAppRatesPage />} />
+        <Route path="/leaves-rates" element={<LeavesRatesPage />} />
         </Routes>
       </div>
     </Router>

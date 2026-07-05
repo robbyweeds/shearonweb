@@ -9,6 +9,12 @@ import { DEFAULT_MULCHING_RATES } from "./Mulching/mulchingDefaults";
 import { computeTurfAppTotals } from "./TurfApp/turfAppCalculations";
 import { DEFAULT_TURF_APP_RATES, INITIAL_TURF_APP_DATA } from "./TurfApp/turfAppDefaults";
 import { formatCurrency } from "../utils/formatters";
+import { computeExtrasTotals, mergeExtrasTable } from "./Extras/extrasCalculations";
+import { computeFlowersTotals, mergeFlowersTable } from "./Flowers/flowersCalculations";
+import { computeLeavesTotals, mergeLeavesData, mergeLeavesRates } from "./Leaves/leavesCalculations";
+import { DEFAULT_LEAVES_RATES } from "./Leaves/leavesDefaults";
+import { computeSpringCleanupTableTotals, mergeSpringCleanupData } from "./SpringCleanup/springCleanupCalculations";
+import { SPRING_CLEANUP_TABLES } from "./SpringCleanup/springCleanupDefaults";
 
 const API_URL = process.env.REACT_APP_API_URL || "";
 const money = formatCurrency;
@@ -23,6 +29,21 @@ const formatShortDate = (value) => {
   return `${month}/${day}/${year.slice(-2)}`;
 };
 
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const filenameSafe = (value) =>
+  String(value || "service-preview")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "service-preview";
+
 export default function ServicesPage() {
   const navigate = useNavigate();
   const { currentServices, updateService, getAllServices, currentRates } =
@@ -33,10 +54,15 @@ export default function ServicesPage() {
     date: "",
     acres: "",
   });
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [draftProjectName, setDraftProjectName] = useState("");
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("project"));
-    if (stored) setProject(stored);
+    if (stored) {
+      setProject(stored);
+      setDraftProjectName(stored.projectName || "");
+    }
   }, []);
 
   const handleProjectFieldChange = (field, value) => {
@@ -45,6 +71,23 @@ export default function ServicesPage() {
       localStorage.setItem("project", JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const handleProjectNameButton = () => {
+    if (!isEditingProjectName) {
+      setDraftProjectName(project.projectName || "");
+      setIsEditingProjectName(true);
+      return;
+    }
+
+    const nextName = draftProjectName.trim();
+    if (!nextName) {
+      alert("Project name is required");
+      return;
+    }
+
+    handleProjectFieldChange("projectName", nextName);
+    setIsEditingProjectName(false);
   };
 
   const deleteMowing = (id) =>
@@ -74,8 +117,6 @@ export default function ServicesPage() {
       "turfApp",
       (currentServices.turfApp || []).filter((t) => t.id !== id)
     );
-  const deleteFlowers = () => updateService("flowers", null);
-  const deleteExtras = () => updateService("extras", null);
 
   const acresPerHour = currentRates?.mowingFactors?.acresPerHour || {};
   const mowingDollars = currentRates?.mowingDollars || {};
@@ -260,24 +301,56 @@ export default function ServicesPage() {
     }
 
     if (currentServices.leaves) {
-      rows.push({
-        id: "leaves",
-        label: currentServices.leaves.area || "Leaves",
-        occ: currentServices.leaves.quantity || "Saved",
-        pricePerOcc: null,
-        total: null,
-        onDelete: deleteLeaves,
-      });
+      const merged = mergeLeavesData(currentServices.leaves);
+      const leavesRates = mergeLeavesRates(currentRates?.leavesRates || DEFAULT_LEAVES_RATES);
+      const totals = computeLeavesTotals(merged, leavesRates);
+      const occ = Number(merged.occurrences || 0);
+
+      if (occ > 0) {
+        rows.push({
+          id: "leaves",
+          label: merged.name || "Fall Cleanup",
+          occ,
+          pricePerOcc: totals.dollarsPerOcc,
+          total: totals.final,
+          onDelete: deleteLeaves,
+        });
+      }
     }
 
     if (currentServices.springCleanup) {
-      rows.push({
-        id: "springCleanup",
-        label: currentServices.springCleanup.area || "Spring Cleanup",
-        occ: currentServices.springCleanup.quantity || "Saved",
-        pricePerOcc: null,
-        total: null,
-        onDelete: deleteSpringCleanup,
+      const merged = mergeSpringCleanupData(currentServices.springCleanup);
+
+      Object.entries(SPRING_CLEANUP_TABLES).forEach(([tableKey, definition]) => {
+        const table = merged.tables[tableKey];
+        const totals = computeSpringCleanupTableTotals(tableKey, table);
+        const occ = Number(table.occurrences || 0);
+        if (occ <= 0) return;
+
+        rows.push({
+          id: `springCleanup-${tableKey}`,
+          label: definition.title,
+          occ,
+          pricePerOcc: totals.dollarsPerOcc,
+          total: totals.totalDollars,
+          onDelete: deleteSpringCleanup,
+        });
+      });
+
+      merged.extraTables.forEach((table) => {
+        const definition = SPRING_CLEANUP_TABLES[table.definitionKey];
+        const totals = computeSpringCleanupTableTotals(table.definitionKey, table);
+        const occ = Number(table.occurrences || 0);
+        if (occ <= 0) return;
+
+        rows.push({
+          id: `springCleanup-${table.id}`,
+          label: table.title || definition.title,
+          occ,
+          pricePerOcc: totals.dollarsPerOcc,
+          total: totals.totalDollars,
+          onDelete: deleteSpringCleanup,
+        });
       });
     }
 
@@ -318,27 +391,57 @@ export default function ServicesPage() {
       });
     });
 
-    if (currentServices.flowers) {
-      rows.push({
-        id: "flowers",
-        label: currentServices.flowers.area || "Flowers",
-        occ: currentServices.flowers.quantity || "Saved",
-        pricePerOcc: null,
-        total: null,
-        onDelete: deleteFlowers,
-      });
-    }
+    const flowerEntries = Array.isArray(currentServices.flowers)
+      ? currentServices.flowers
+      : [];
 
-    if (currentServices.extras) {
-      rows.push({
-        id: "extras",
-        label: currentServices.extras.area || "Extras",
-        occ: currentServices.extras.quantity || "Saved",
-        pricePerOcc: null,
-        total: null,
-        onDelete: deleteExtras,
+    flowerEntries.forEach((entry, index) => {
+      const merged = mergeFlowersTable({
+        ...(entry.data || {}),
+        name: entry.data?.name || `Flowers #${index + 1}`,
       });
-    }
+      const totals = computeFlowersTotals(merged);
+      const occ = Number(merged.occurrences || 0);
+      if (occ <= 0) return;
+
+      rows.push({
+        id: `flowers-${entry.id}`,
+        label: merged.name || "Flowers",
+        occ,
+        pricePerOcc: totals.dollarsPerOcc,
+        total: totals.totalDollars,
+        onDelete: () => updateService(
+          "flowers",
+          (currentServices.flowers || []).filter((table) => table.id !== entry.id)
+        ),
+      });
+    });
+
+    const extrasEntries = Array.isArray(currentServices.extras)
+      ? currentServices.extras
+      : [];
+
+    extrasEntries.forEach((entry, index) => {
+      const merged = mergeExtrasTable({
+        ...(entry.data || {}),
+        name: entry.data?.name || `Extras #${index + 1}`,
+      });
+      const totals = computeExtrasTotals(merged);
+      const occ = Number(merged.occurrences || 0);
+      if (occ <= 0) return;
+
+      rows.push({
+        id: `extras-${entry.id}`,
+        label: merged.name || "Extras",
+        occ,
+        pricePerOcc: totals.dollarsPerOcc,
+        total: totals.totalDollars,
+        onDelete: () => updateService(
+          "extras",
+          (currentServices.extras || []).filter((table) => table.id !== entry.id)
+        ),
+      });
+    });
 
     return rows;
   })();
@@ -347,6 +450,129 @@ export default function ServicesPage() {
     (total, row) => total + (typeof row.total === "number" ? row.total : 0),
     0
   );
+
+  const handleDownloadPreview = () => {
+    if (summaryRows.length === 0) {
+      alert("Add a service before downloading the preview.");
+      return;
+    }
+
+    const propertyName = project.projectName || "New Project";
+    const date = formatShortDate(project.date);
+    const acres = project.acres || "Not set";
+    const rows = summaryRows
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapeHtml(row.label)}</td>
+            <td>${escapeHtml(row.occ)}</td>
+            <td>${row.pricePerOcc === null ? "-" : escapeHtml(money(row.pricePerOcc))}</td>
+            <td>${row.total === null ? "-" : escapeHtml(money(row.total))}</td>
+          </tr>`
+      )
+      .join("");
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(propertyName)} Service Preview</title>
+  <style>
+    body {
+      color: #17211b;
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 40px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 16px;
+    }
+    .project-meta {
+      border-bottom: 2px solid #236b4a;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+    }
+    .project-meta span {
+      color: #66706a;
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .project-meta strong {
+      font-size: 16px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th,
+    td {
+      border-bottom: 1px solid #d9dfd8;
+      padding: 12px 10px;
+      text-align: left;
+    }
+    th:not(:first-child),
+    td:not(:first-child) {
+      text-align: right;
+    }
+    th {
+      color: #66706a;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    tfoot td {
+      border-bottom: 0;
+      font-weight: 700;
+    }
+    @media print {
+      body {
+        margin: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(propertyName)}</h1>
+  <section class="project-meta">
+    <div><span>Property Name</span><strong>${escapeHtml(propertyName)}</strong></div>
+    <div><span>Acres</span><strong>${escapeHtml(acres)}</strong></div>
+    <div><span>Date</span><strong>${escapeHtml(date)}</strong></div>
+  </section>
+  <table>
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th>Occurrences</th>
+        <th>Price / Occ</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Estimated Project Total</td>
+        <td>${escapeHtml(money(projectTotal))}</td>
+      </tr>
+    </tfoot>
+  </table>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filenameSafe(propertyName)}-service-preview.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const handleSaveProject = async () => {
     const services = getAllServices() || {};
@@ -397,7 +623,24 @@ export default function ServicesPage() {
         <div className="services-header">
           <div className="page-title">
             <p>Service Builder</p>
-            <h1>{project.projectName || "New Project"}</h1>
+            <div className="editable-project-title">
+              {isEditingProjectName ? (
+                <input
+                  value={draftProjectName}
+                  onChange={(e) => setDraftProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleProjectNameButton();
+                  }}
+                  aria-label="Project name"
+                  autoFocus
+                />
+              ) : (
+                <h1>{project.projectName || "New Project"}</h1>
+              )}
+              <button className="secondary-button compact-button" onClick={handleProjectNameButton} type="button">
+                {isEditingProjectName ? "Save New Name" : "Edit Name"}
+              </button>
+            </div>
           </div>
           <div className="header-actions">
             <button className="secondary-button" onClick={() => navigate("/")} type="button">Main Page</button>
@@ -447,7 +690,17 @@ export default function ServicesPage() {
         <section className="summary-panel">
           <div className="section-heading">
             <span>Service Summary</span>
-            <strong>{summaryRows.length} services</strong>
+            <div className="summary-heading-actions">
+              <strong>{summaryRows.length} services</strong>
+              <button
+                className="secondary-button compact-button"
+                disabled={summaryRows.length === 0}
+                onClick={handleDownloadPreview}
+                type="button"
+              >
+                Download Chart
+              </button>
+            </div>
           </div>
 
           {summaryRows.length === 0 ? (

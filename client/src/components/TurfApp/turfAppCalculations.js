@@ -49,6 +49,14 @@ export function mergeTurfAppRates(rates = {}) {
   };
 }
 
+function applyManualOverride(key, autoValue, data) {
+  const overrides = data.manualOverrides || {};
+  const hasManual =
+    Object.prototype.hasOwnProperty.call(overrides, key) && overrides[key] != null;
+  const finalValue = hasManual ? Number(overrides[key]) : autoValue;
+  return Number.isFinite(finalValue) ? finalValue : 0;
+}
+
 function computeEquipmentHours(key, base, data, qtyUnit, rates) {
   const normalApps =
     Number(qtyUnit.BARRICADE || 0) +
@@ -74,7 +82,7 @@ function computeEquipmentHours(key, base, data, qtyUnit, rates) {
     result = base * Number(rates.equipmentMultiples.broadleaf[key] || 0);
   }
 
-  return roundToQuarter(result);
+  return applyManualOverride(key, roundToQuarter(result), data);
 }
 
 export function computeTurfAppQuantities(data, ratesInput = {}) {
@@ -106,7 +114,7 @@ export function computeTurfAppQuantities(data, ratesInput = {}) {
 
   qtyUnit.TRUCKSTER = computeEquipmentHours("TRUCKSTER", trucksterBase, data, qtyUnit, rates);
   qtyUnit.ZMAX = computeEquipmentHours("ZMAX", zmaxBase, data, qtyUnit, rates);
-  qtyUnit.HAND = roundToQuarter(handBase);
+  qtyUnit.HAND = applyManualOverride("HAND", roundToQuarter(handBase), data);
 
   return qtyUnit;
 }
@@ -120,6 +128,7 @@ export function computeTurfAppTotals(data, ratesInput = {}) {
   const dollars = {
     ...rates.dollars,
     FERTILIZER: Number(fertilizer?.price ?? rates.dollars.FERTILIZER ?? 0),
+    OTHER_MATERIAL: Number(data.otherMaterialUnitPrice ?? rates.dollars.OTHER_MATERIAL ?? 0),
   };
   const rowTotals = {};
 

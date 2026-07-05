@@ -18,7 +18,7 @@ export const TURF_COLUMNS = [
   { key: "TRIMEC", label: "TRIMEC", unit: "GALS" },
   { key: "MERIT", label: "Merit", unit: "oz" },
   { key: "FERTILIZER", label: "Fertilizer", unit: "Bags" },
-  { key: "OTHER_MATERIAL", label: "Other Material", unit: "UNIT", manual: true },
+  { key: "OTHER_MATERIAL", label: "Other Material", unit: "UNIT", manual: true, editableLabel: true },
 ];
 
 export const DEFAULT_TURF_APP_RATES = {
@@ -92,9 +92,16 @@ export const INITIAL_TURF_APP_DATA = {
   addGrub: false,
   addGranularFert: false,
   fertilizerOption: "18%N at 0.5lbs",
+  otherMaterialName: "Other Material",
+  otherMaterialUnitPrice: 0,
   qtyUnit: {
     MISC: 0,
     OTHER_MATERIAL: 0,
+  },
+  manualOverrides: {
+    TRUCKSTER: null,
+    ZMAX: null,
+    HAND: null,
   },
   summary: {
     numOccurrences: 0,

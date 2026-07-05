@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../../context/ServiceContext";
 import { DEFAULT_MULCHING_RATES } from "./mulchingDefaults";
@@ -8,15 +8,16 @@ export default function MulchingRatesPage() {
   const navigate = useNavigate();
   const { currentRates, updateRates } = useServiceContext();
 
-  const savedMulchingRates = mergeMulchingRates(
-    currentRates?.mulchingRates || DEFAULT_MULCHING_RATES
+  const savedMulchingRates = useMemo(
+    () => mergeMulchingRates(currentRates?.mulchingRates || DEFAULT_MULCHING_RATES),
+    [currentRates?.mulchingRates]
   );
 
   const [localRates, setLocalRates] = useState(savedMulchingRates);
 
   useEffect(() => {
     setLocalRates(savedMulchingRates);
-  }, [currentRates?.mulchingRates]);
+  }, [savedMulchingRates]);
 
   const setCategoryRate = (category, key, value) => {
     setLocalRates((prev) => ({

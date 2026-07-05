@@ -77,6 +77,7 @@ export default function PruningTable({ tableId, onDelete }) {
     );
 
     updateService("pruning", updated); // MUST SET ENTIRE ARRAY
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localData]);
 
   const updateQty = (key, value) =>

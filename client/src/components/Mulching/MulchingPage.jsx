@@ -179,7 +179,32 @@ export default function MulchingPage({ tableId, onDelete }) {
       type="text"
       inputMode="numeric"
       value={formatInputNumber(value)}
+      onFocus={(e) => {
+        if (Number(value || 0) === 0) e.target.value = "";
+      }}
+      onBlur={(e) => {
+        if (e.target.value === "") e.target.value = formatInputNumber(value);
+      }}
       onChange={(e) => onChange(parseFormattedNumber(e.target.value))}
+      style={inputStyle}
+    />
+  );
+
+  const coverageInput = (value, onChange) => (
+    <input
+      type="number"
+      value={value}
+      min="0"
+      step="1"
+      onFocus={(e) => {
+        e.target.value = "";
+      }}
+      onBlur={(e) => {
+        if (e.target.value === "") e.target.value = value;
+      }}
+      onChange={(e) => {
+        if (e.target.value !== "") onChange(Number(e.target.value) || 0);
+      }}
       style={inputStyle}
     />
   );
@@ -332,7 +357,7 @@ export default function MulchingPage({ tableId, onDelete }) {
         <td style={cellStyle}></td>
         {MULCH_AREA_KEYS.map((areaKey) => (
           <td key={areaKey} style={cellStyle}>
-            {numberInput(section.areas[areaKey].coverage, (value) => updateAreaField(sectionKey, areaKey, "coverage", value), "1")}%
+            {coverageInput(section.areas[areaKey].coverage, (value) => updateAreaField(sectionKey, areaKey, "coverage", value))}%
           </td>
         ))}
         <td colSpan={5} style={cellStyle}></td>

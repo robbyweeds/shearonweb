@@ -35,6 +35,7 @@ export default function PruningForm() {
     } else {
       setTables(currentServices.pruning);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // -----------------------------
@@ -85,15 +86,6 @@ export default function PruningForm() {
     <div className="service-entry-page pruning-entry-page">
       <h2 style={{ marginBottom: "1rem" }}>Pruning</h2>
 
-      <div className="service-top-actions">
-        <button className="save-project-button" onClick={handleSave} type="button">
-          Save Pruning
-        </button>
-        <button className="secondary-button" onClick={() => navigate(-1)} type="button">
-          Back
-        </button>
-      </div>
-
       {tables.map((t, index) => (
         <div
           key={t.id}
@@ -113,22 +105,24 @@ export default function PruningForm() {
         </div>
       ))}
 
-      <div className="service-page-actions pruning-page-actions">
+      <div className="pruning-actions-stack">
         <button onClick={addTable} type="button">
           Add Pruning Table
         </button>
 
-        <button className="save-project-button" onClick={handleSave} type="button">
-          Save Pruning
-        </button>
+        <div className="service-page-actions pruning-page-actions">
+          <button className="save-project-button" onClick={handleSave} type="button">
+            Save Pruning
+          </button>
 
-        <button className="danger-button" onClick={handleReset} type="button">
-          Reset
-        </button>
+          <button className="danger-button" onClick={handleReset} type="button">
+            Reset
+          </button>
 
-        <button className="secondary-button" onClick={() => navigate(-1)} type="button">
-          Back
-        </button>
+          <button className="secondary-button" onClick={() => navigate(-1)} type="button">
+            Back
+          </button>
+        </div>
       </div>
     </div>
   );

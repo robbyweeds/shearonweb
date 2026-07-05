@@ -1,6 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../context/ServiceContext";
+import { formatCurrency } from "../utils/formatters";
+import { INITIAL_MOWING_DATA } from "./Mowing/mowingDefaults";
+import { computeHours, computeTotals } from "./Mowing/mowingCalculations";
+import { computeMulchingTotals } from "./Mulching/mulchingCalculations";
+import { DEFAULT_MULCHING_RATES } from "./Mulching/mulchingDefaults";
+import { computePruningTotals } from "./Pruning/pruningCalculations";
+import { computeTurfAppTotals } from "./TurfApp/turfAppCalculations";
+import { DEFAULT_TURF_APP_RATES, INITIAL_TURF_APP_DATA } from "./TurfApp/turfAppDefaults";
+import { computeExtrasTotals, mergeExtrasTable } from "./Extras/extrasCalculations";
+import { computeFlowersTotals, mergeFlowersTable } from "./Flowers/flowersCalculations";
+import { computeLeavesTotals, mergeLeavesData, mergeLeavesRates } from "./Leaves/leavesCalculations";
+import { DEFAULT_LEAVES_RATES } from "./Leaves/leavesDefaults";
+import { computeSpringCleanupTableTotals, mergeSpringCleanupData } from "./SpringCleanup/springCleanupCalculations";
+import { SPRING_CLEANUP_TABLES } from "./SpringCleanup/springCleanupDefaults";
 
 const API_URL = process.env.REACT_APP_API_URL || "";
 const SAVED_RATES_KEY = "__rates";
@@ -13,6 +27,113 @@ const formatShortDate = (value) => {
   if (!year || !month || !day) return value;
 
   return `${month}/${day}/${year.slice(-2)}`;
+};
+
+const asArray = (value) => (Array.isArray(value) ? value : []);
+
+const computeEdgingTotal = (entry) => {
+  if (!entry?.data) return 0;
+
+  const d = entry.data;
+  const qty = d.qtyUnit || { EDGER: 0, BLOWER: 0 };
+  const price = d.unitPrice || { EDGER: 0, BLOWER: 0 };
+  const occ = Number(d.summary?.numOccurrences || 0);
+
+  return (Number(qty.EDGER || 0) * Number(price.EDGER || 0) +
+    Number(qty.BLOWER || 0) * Number(price.BLOWER || 0)) * occ;
+};
+
+const computeBedMaintenanceTotal = (entry) => {
+  if (!entry?.data) return 0;
+
+  const d = entry.data;
+  const qty = d.qtyUnit || { HAND: 0, BACKPACK: 0, ROUNDUP: 0 };
+  const price = d.unitPrice || { HAND: 0, BACKPACK: 0, ROUNDUP: 0 };
+  const occ = Number(d.summary?.numOccurrences || 0);
+
+  return (Number(qty.HAND || 0) * Number(price.HAND || 0) +
+    Number(qty.BACKPACK || 0) * Number(price.BACKPACK || 0) +
+    Number(qty.ROUNDUP || 0) * Number(price.ROUNDUP || 0)) * occ;
+};
+
+const getProjectContractTotal = (project) => {
+  const services = project.services || {};
+  const rates = services[SAVED_RATES_KEY] || {};
+  let total = 0;
+
+  asArray(services.mowing).forEach((entry) => {
+    const raw = entry.data || {};
+    const merged = {
+      ...INITIAL_MOWING_DATA,
+      ...raw,
+      acres: { ...INITIAL_MOWING_DATA.acres, ...(raw.acres || {}) },
+      qtyUnit: { ...INITIAL_MOWING_DATA.qtyUnit, ...(raw.qtyUnit || {}) },
+      selectedEfficiency: {
+        ...INITIAL_MOWING_DATA.selectedEfficiency,
+        ...(raw.selectedEfficiency || {}),
+      },
+      manualOverrides: {
+        ...INITIAL_MOWING_DATA.manualOverrides,
+        ...(raw.manualOverrides || {}),
+      },
+      summary: { ...INITIAL_MOWING_DATA.summary, ...(raw.summary || {}) },
+    };
+    const qty = computeHours(merged, rates.mowingFactors?.acresPerHour || {});
+    total += computeTotals(merged, qty, rates.mowingDollars || {}).final || 0;
+  });
+
+  asArray(services.mulching).forEach((entry) => {
+    total += computeMulchingTotals(entry.data || {}, rates.mulchingRates || DEFAULT_MULCHING_RATES).totalPrice || 0;
+  });
+
+  asArray(services.pruning).forEach((entry) => {
+    total += computePruningTotals(entry.data || {}, rates.pruningRates).finalTotal || 0;
+  });
+
+  if (services.edging) {
+    total += computeEdgingTotal(Array.isArray(services.edging) ? services.edging[0] : services.edging);
+  }
+
+  if (services.bedMaintenance) {
+    total += computeBedMaintenanceTotal(Array.isArray(services.bedMaintenance) ? services.bedMaintenance[0] : services.bedMaintenance);
+  }
+
+  if (services.leaves) {
+    const leavesRates = mergeLeavesRates(rates.leavesRates || DEFAULT_LEAVES_RATES);
+    total += computeLeavesTotals(mergeLeavesData(services.leaves), leavesRates).final || 0;
+  }
+
+  if (services.springCleanup) {
+    const merged = mergeSpringCleanupData(services.springCleanup);
+    Object.keys(SPRING_CLEANUP_TABLES).forEach((tableKey) => {
+      total += computeSpringCleanupTableTotals(tableKey, merged.tables[tableKey]).totalDollars || 0;
+    });
+    merged.extraTables.forEach((table) => {
+      total += computeSpringCleanupTableTotals(table.definitionKey, table).totalDollars || 0;
+    });
+  }
+
+  const turfRates = { ...DEFAULT_TURF_APP_RATES, ...(rates.turfAppRates || {}) };
+  asArray(services.turfApp).forEach((entry) => {
+    const raw = entry.data || {};
+    const merged = {
+      ...INITIAL_TURF_APP_DATA,
+      ...raw,
+      qtyUnit: { ...INITIAL_TURF_APP_DATA.qtyUnit, ...(raw.qtyUnit || {}) },
+      summary: { ...INITIAL_TURF_APP_DATA.summary, ...(raw.summary || {}) },
+    };
+    total += computeTurfAppTotals(merged, turfRates).final || 0;
+  });
+
+  asArray(services.flowers).forEach((entry) => {
+    total += computeFlowersTotals(mergeFlowersTable(entry.data || {})).totalDollars || 0;
+  });
+
+  asArray(services.extras).forEach((entry) => {
+    total += computeExtrasTotals(mergeExtrasTable(entry.data || {})).totalDollars || 0;
+  });
+
+  return total;
 };
 
 export default function ProjectForm() {
@@ -52,11 +173,11 @@ export default function ProjectForm() {
     Object.keys(value).length === 0;
 
   const normalizeLoadedService = (key, value) => {
-    if (["mowing", "mulching", "pruning", "turfApp"].includes(key)) {
+    if (["mowing", "mulching", "pruning", "turfApp", "flowers", "extras"].includes(key)) {
       return Array.isArray(value) ? value : [];
     }
 
-    if (["edging", "bedMaintenance", "leaves", "springCleanup", "flowers", "extras"].includes(key)) {
+    if (["edging", "bedMaintenance", "leaves", "springCleanup"].includes(key)) {
       return isEmptyObject(value) ? null : value;
     }
 
@@ -177,7 +298,7 @@ export default function ProjectForm() {
             >
               <div>
                 <h3>{p.project_name}</h3>
-                <p>{formatShortDate(p.date)} - {p.acres || 0} acres</p>
+                <p>{formatShortDate(p.date)} - {p.acres || 0} acres - {formatCurrency(getProjectContractTotal(p))}</p>
               </div>
               <div className="button-row tight-row">
                 <button className="secondary-button compact-button" onClick={() => handleLoad(p.id)} type="button">

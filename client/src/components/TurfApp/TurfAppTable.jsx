@@ -30,6 +30,10 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
         ...INITIAL_TURF_APP_DATA.qtyUnit,
         ...(saved.qtyUnit || {}),
       },
+      manualOverrides: {
+        ...INITIAL_TURF_APP_DATA.manualOverrides,
+        ...(saved.manualOverrides || {}),
+      },
       summary: {
         ...INITIAL_TURF_APP_DATA.summary,
         ...(saved.summary || {}),
@@ -59,17 +63,40 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
     save({ ...data, [field]: e.target.value });
   };
 
+  const clearManualOverrides = (overrides, keys) =>
+    keys.reduce(
+      (next, key) => ({ ...next, [key]: null }),
+      { ...(overrides || {}) }
+    );
+
   const handleFieldChange = (field) => (e) => {
     const value =
       e.target.type === "number"
         ? parseFloat(e.target.value) || 0
         : e.target.value;
 
-    save({ ...data, [field]: value });
+    const overrideKeys = {
+      acres: ["TRUCKSTER", "ZMAX", "HAND"],
+      propertyType: ["TRUCKSTER", "ZMAX"],
+      hand: ["HAND"],
+      fertilizerOption: ["TRUCKSTER", "ZMAX"],
+    }[field];
+
+    save({
+      ...data,
+      [field]: value,
+      manualOverrides: overrideKeys
+        ? clearManualOverrides(data.manualOverrides, overrideKeys)
+        : data.manualOverrides,
+    });
   };
 
   const handleCheckboxChange = (field) => (e) => {
-    save({ ...data, [field]: e.target.checked });
+    save({
+      ...data,
+      [field]: e.target.checked,
+      manualOverrides: clearManualOverrides(data.manualOverrides, ["TRUCKSTER", "ZMAX"]),
+    });
   };
 
   const handleManualQtyChange = (key) => (e) => {
@@ -78,6 +105,36 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
     save({
       ...data,
       qtyUnit: { ...data.qtyUnit, [key]: value },
+    });
+  };
+
+  const handleOtherMaterialPriceChange = (e) => {
+    const value = parseFloat(e.target.value) || 0;
+
+    save({
+      ...data,
+      otherMaterialUnitPrice: value,
+    });
+  };
+
+  const handleManualOverride = (key) => (e) => {
+    const raw = e.target.value;
+
+    if (raw === "") {
+      save({
+        ...data,
+        manualOverrides: { ...data.manualOverrides, [key]: null },
+      });
+      return;
+    }
+
+    const num = parseFloat(raw);
+    const snapped = Math.round((isNaN(num) ? 0 : num) * 4) / 4;
+    const final = Number(snapped.toFixed(2));
+
+    save({
+      ...data,
+      manualOverrides: { ...data.manualOverrides, [key]: final },
     });
   };
 
@@ -213,7 +270,18 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
           <tr>
             <th style={cellStyle}>ITEM</th>
             {TURF_COLUMNS.map((col) => (
-              <th key={col.key} style={cellStyle}>{col.label}</th>
+              <th key={col.key} style={cellStyle}>
+                {col.editableLabel ? (
+                  <input
+                    type="text"
+                    value={data.otherMaterialName}
+                    onChange={handleTextChange("otherMaterialName")}
+                    style={{ width: "130px", padding: "4px", fontSize: "12px", textAlign: "center" }}
+                  />
+                ) : (
+                  col.label
+                )}
+              </th>
             ))}
             <th style={summaryLabelStyle}>HRS/OCC</th>
             <th style={summaryValueStyle}>{totals.hoursPerOcc.toFixed(1)}</th>
@@ -294,7 +362,7 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
           <tr>
             <td style={cellStyle}>QTY/UNIT</td>
             {TURF_COLUMNS.map((col) => (
-              <td key={col.key} style={col.manual ? inputCellStyle : computedCellStyle}>
+              <td key={col.key} style={col.manual || ["TRUCKSTER", "ZMAX", "HAND"].includes(col.key) ? inputCellStyle : computedCellStyle}>
                 {col.manual ? (
                   <LabeledInput
                     value={data.qtyUnit[col.key] || 0}
@@ -302,6 +370,14 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
                     min={0}
                     step={0.1}
                     onChange={handleManualQtyChange(col.key)}
+                  />
+                ) : ["TRUCKSTER", "ZMAX", "HAND"].includes(col.key) ? (
+                  <LabeledInput
+                    value={formatQtyValue(col.key, data.manualOverrides[col.key] ?? totals.qtyUnit[col.key])}
+                    type="number"
+                    min={0}
+                    step={0.25}
+                    onChange={handleManualOverride(col.key)}
                   />
                 ) : (
                   <strong>{formatQtyValue(col.key, totals.qtyUnit[col.key])}</strong>
@@ -316,7 +392,19 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
           <tr>
             <td style={cellStyle}>UNIT $</td>
             {TURF_COLUMNS.map((col) => (
-              <td key={col.key} style={cellStyle}>{formatCurrency(totals.dollars[col.key])}</td>
+              <td key={col.key} style={col.key === "OTHER_MATERIAL" ? inputCellStyle : cellStyle}>
+                {col.key === "OTHER_MATERIAL" ? (
+                  <LabeledInput
+                    value={data.otherMaterialUnitPrice}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    onChange={handleOtherMaterialPriceChange}
+                  />
+                ) : (
+                  formatCurrency(totals.dollars[col.key])
+                )}
+              </td>
             ))}
             <td style={summaryLabelStyle}># OCC</td>
             <td style={{ ...summaryValueStyle, background: "yellow" }}>
