@@ -98,12 +98,55 @@ button:focus-visible {
   max-width: 1060px;
 }
 
+.main-project-shell {
+  grid-template-areas:
+    "brand brand"
+    "rail panel";
+}
+
+.brand-title {
+  align-items: flex-start;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--primary);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  grid-area: brand;
+  padding: 0.8rem 1rem;
+}
+
+.brand-title h1 {
+  font-size: clamp(1.55rem, 3vw, 2.35rem);
+  line-height: 1;
+  margin: 0;
+}
+
+.brand-title p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
 .project-rail,
 .workspace-panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.main-project-shell .project-rail {
+  grid-area: rail;
+}
+
+.main-project-shell .workspace-panel {
+  grid-area: panel;
 }
 
 .project-rail {
@@ -189,7 +232,11 @@ button:focus-visible {
 }
 
 .two-column {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+.project-details-grid {
+  max-width: 260px;
 }
 
 .form-actions {
@@ -208,7 +255,8 @@ button:focus-visible {
 }
 
 .service-tool-row,
-.service-page-actions {
+.service-page-actions,
+.service-top-actions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -221,6 +269,10 @@ button:focus-visible {
 
 .service-page-actions {
   margin-top: 2rem;
+}
+
+.service-top-actions {
+  margin: 0 0 1rem;
 }
 
 .pruning-page-actions {
@@ -279,6 +331,18 @@ button:focus-visible {
 .secondary-button:hover {
   background: var(--secondary-hover);
   box-shadow: 0 8px 18px rgba(57, 84, 103, 0.18);
+}
+
+.save-project-button {
+  background: #d4a72c;
+  color: #17211b;
+  min-width: 150px;
+  box-shadow: 0 8px 18px rgba(212, 167, 44, 0.22);
+}
+
+.save-project-button:hover {
+  background: #be9221;
+  box-shadow: 0 10px 22px rgba(212, 167, 44, 0.3);
 }
 
 .ghost-button {
@@ -400,6 +464,14 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .main-project-shell {
+    grid-template-areas:
+      "brand"
+      "rail"
+      "panel";
+  }
+
+
   .project-rail {
     max-height: none;
     position: static;
@@ -426,13 +498,15 @@ button:focus-visible {
   }
 
   .service-tool-row,
-  .service-page-actions {
+  .service-page-actions,
+  .service-top-actions {
     align-items: stretch;
     flex-direction: column;
   }
 
   .service-tool-row button,
-  .service-page-actions button {
+  .service-page-actions button,
+  .service-top-actions button {
     min-width: 0;
     width: 100%;
   }

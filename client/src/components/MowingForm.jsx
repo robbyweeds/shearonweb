@@ -74,7 +74,16 @@ export default function MowingForm() {
 
   return (
     <div className="service-entry-page">
-      <h2>Service Entry</h2>
+      <h2>Mowing Services</h2>
+
+      <div className="service-top-actions">
+        <button className="save-project-button" onClick={handleSave} type="button">
+          Save Mowing
+        </button>
+        <button className="secondary-button" onClick={() => navigate(-1)} type="button">
+          Back
+        </button>
+      </div>
 
       {/* Edging + Bed Maintenance stay attached and never reset */}
       <ServiceTablesWrapper />
@@ -98,8 +107,8 @@ export default function MowingForm() {
       </div>
 
       <div className="service-page-actions">
-        <button onClick={handleSave} type="button">
-          Save
+        <button className="save-project-button" onClick={handleSave} type="button">
+          Save Mowing
         </button>
         <button className="danger-button" onClick={handleReset} type="button">
           Reset

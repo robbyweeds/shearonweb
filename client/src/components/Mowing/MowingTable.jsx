@@ -195,7 +195,7 @@ export default function MowingTable({ tableId, onDelete }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "2fr 100px 100px",
+          gridTemplateColumns: "2fr 100px",
           gap: "15px",
           alignItems: "end",
           marginBottom: "12px",
@@ -224,16 +224,6 @@ export default function MowingTable({ tableId, onDelete }) {
             type="number"
             value={data.crewSize}
             onChange={handleFieldChange("crewSize")}
-            style={{ width: "100%", padding: "6px" }}
-          />
-        </div>
-
-        <div>
-          <label style={{ fontWeight: "bold" }}>Days</label>
-          <input
-            type="number"
-            value={data.days}
-            onChange={handleFieldChange("days")}
             style={{ width: "100%", padding: "6px" }}
           />
         </div>

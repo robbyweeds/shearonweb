@@ -93,6 +93,7 @@ export function ServiceProvider({ children }) {
     mulching: null,
     pruning: [],     // ✅ FIXED (must be an array)
     leaves: null,
+    springCleanup: null,
     turfApp: [],
     flowers: null,
     extras: null,
@@ -142,6 +143,7 @@ export function ServiceProvider({ children }) {
       mulching: null,
       pruning: [],   // ✅ FIXED (was null — must stay an array)
       leaves: null,
+      springCleanup: null,
       turfApp: [],
       flowers: null,
       extras: null,

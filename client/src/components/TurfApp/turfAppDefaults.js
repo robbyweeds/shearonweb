@@ -46,9 +46,9 @@ export const DEFAULT_TURF_APP_RATES = {
   },
   handFactors: {
     None: 0,
-    Minimal: 0.04,
-    Medium: 0.12,
-    Substantial: 0.23,
+    Minimal: 0.1,
+    Medium: 0.2,
+    Substantial: 0.3,
   },
   materialAmounts: {
     BARRICADE: { yes: 24, no: 0 },

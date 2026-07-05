@@ -6,6 +6,15 @@ const API_URL = process.env.REACT_APP_API_URL || "";
 const SAVED_RATES_KEY = "__rates";
 const EMPTY_PROJECT = { id: null, projectName: "", date: "", acres: "" };
 
+const formatShortDate = (value) => {
+  if (!value) return "No date";
+
+  const [year, month, day] = String(value).split("T")[0].split("-");
+  if (!year || !month || !day) return value;
+
+  return `${month}/${day}/${year.slice(-2)}`;
+};
+
 export default function ProjectForm() {
   const navigate = useNavigate();
   const { updateService, resetServices, resetRates, updateRates } = useServiceContext();
@@ -47,7 +56,7 @@ export default function ProjectForm() {
       return Array.isArray(value) ? value : [];
     }
 
-    if (["edging", "bedMaintenance", "leaves", "flowers", "extras"].includes(key)) {
+    if (["edging", "bedMaintenance", "leaves", "springCleanup", "flowers", "extras"].includes(key)) {
       return isEmptyObject(value) ? null : value;
     }
 
@@ -140,7 +149,12 @@ export default function ProjectForm() {
   };
 
   return (
-    <main className="app-shell">
+    <main className="app-shell main-project-shell">
+      <header className="brand-title">
+        <h1>Shearon Environmental Design</h1>
+        <p>Powered by RobbyWeeds</p>
+      </header>
+
       <aside className="project-rail" aria-label="Existing projects">
         <div className="section-heading">
           <span>Recent Projects</span>
@@ -163,7 +177,7 @@ export default function ProjectForm() {
             >
               <div>
                 <h3>{p.project_name}</h3>
-                <p>{p.date || "No date"} - {p.acres || 0} acres</p>
+                <p>{formatShortDate(p.date)} - {p.acres || 0} acres</p>
               </div>
               <div className="button-row tight-row">
                 <button className="secondary-button compact-button" onClick={() => handleLoad(p.id)} type="button">
@@ -181,7 +195,7 @@ export default function ProjectForm() {
       <section className="workspace-panel">
         <div className="page-title">
           <p>Project Setup</p>
-          <h1>Create or Edit Project</h1>
+          <h1>Create Project</h1>
         </div>
 
         <form className="stacked-form" onSubmit={handleContinue}>
@@ -197,7 +211,7 @@ export default function ProjectForm() {
             />
           </label>
 
-          <div className="form-grid two-column">
+          <div className="form-grid project-details-grid">
             <label>
               <span>Date</span>
               <input type="date" name="date" value={formData.date} onChange={handleChange} required />
@@ -219,7 +233,7 @@ export default function ProjectForm() {
           </div>
 
           <div className="button-row form-actions">
-            <button type="submit">Continue to Services</button>
+            <button type="submit">Create</button>
           </div>
         </form>
       </section>

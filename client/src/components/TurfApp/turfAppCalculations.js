@@ -102,12 +102,11 @@ export function computeTurfAppQuantities(data, ratesInput = {}) {
     Number(rates.acresPerHour.ZMAX || 0) > 0
       ? (acres * Number(areaType?.zmax || 0)) / Number(rates.acresPerHour.ZMAX || 0)
       : 0;
-  const handBase =
-    acres * Number(areaType?.hand || 0) * Number(rates.handFactors[data.hand] || 0);
+  const handBase = acres * Number(rates.handFactors[data.hand] || 0);
 
   qtyUnit.TRUCKSTER = computeEquipmentHours("TRUCKSTER", trucksterBase, data, qtyUnit, rates);
   qtyUnit.ZMAX = computeEquipmentHours("ZMAX", zmaxBase, data, qtyUnit, rates);
-  qtyUnit.HAND = computeEquipmentHours("HAND", handBase, data, qtyUnit, rates);
+  qtyUnit.HAND = roundToQuarter(handBase);
 
   return qtyUnit;
 }

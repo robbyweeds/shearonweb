@@ -17,6 +17,7 @@ export default function ServiceTablesWrapper() {
       updateService("edging", {
         id: "EDGING1",
         data: {
+          name: "Edging",
           qtyUnit: { EDGER: 0, BLOWER: 0 },
           unitPrice: { EDGER: 55, BLOWER: 55 },
           summary: { numOccurrences: 0 }
@@ -29,6 +30,7 @@ export default function ServiceTablesWrapper() {
       updateService("bedMaintenance", {
         id: "BED1",
         data: {
+          name: "Bed Maintenance",
           qtyUnit: { HAND: 0, BACKPACK: 0, ROUNDUP: 0 },
           unitPrice: { HAND: 55, BACKPACK: 55, ROUNDUP: 50 },
           summary: { numOccurrences: 0 }

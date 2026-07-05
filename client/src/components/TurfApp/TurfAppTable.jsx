@@ -120,6 +120,11 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
     fontWeight: "bold",
   };
 
+  const formatQtyValue = (key, value) => {
+    const precision = ["TRUCKSTER", "ZMAX", "HAND", "MISC", "TRIMEC"].includes(key) ? 2 : 1;
+    return Number(value || 0).toFixed(precision);
+  };
+
   return (
     <div
       style={{
@@ -299,7 +304,7 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
                     onChange={handleManualQtyChange(col.key)}
                   />
                 ) : (
-                  <strong>{Number(totals.qtyUnit[col.key] || 0).toFixed(col.key === "TRIMEC" ? 2 : 1)}</strong>
+                  <strong>{formatQtyValue(col.key, totals.qtyUnit[col.key])}</strong>
                 )}
                 <div style={{ fontSize: "0.7rem", color: "#444" }}>{col.unit}</div>
               </td>

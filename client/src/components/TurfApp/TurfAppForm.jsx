@@ -76,6 +76,15 @@ export default function TurfAppForm() {
     <div className="service-entry-page">
       <h2>Turf Application</h2>
 
+      <div className="service-top-actions">
+        <button className="save-project-button" onClick={handleSave} type="button">
+          Save Turf App
+        </button>
+        <button className="secondary-button" onClick={() => navigate(-1)} type="button">
+          Back
+        </button>
+      </div>
+
       {tables.map((table, index) => (
         <TurfAppTable
           key={table.id}
@@ -94,8 +103,8 @@ export default function TurfAppForm() {
       </div>
 
       <div className="service-page-actions">
-        <button onClick={handleSave} type="button">
-          Save
+        <button className="save-project-button" onClick={handleSave} type="button">
+          Save Turf App
         </button>
         <button className="danger-button" onClick={handleReset} type="button">
           Reset

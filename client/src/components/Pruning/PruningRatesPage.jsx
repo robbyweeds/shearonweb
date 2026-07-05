@@ -74,18 +74,11 @@ export default function PruningRatesPage() {
       </table>
 
       <button
+        className="save-project-button"
         onClick={handleSave}
-        style={{
-          marginTop: "1.5rem",
-          padding: "10px 20px",
-          backgroundColor: "#007bff",
-          color: "white",
-          border: "none",
-          borderRadius: "5px",
-          cursor: "pointer"
-        }}
+        style={{ marginTop: "1.5rem" }}
       >
-        Save Rates
+        Save Pruning Rates
       </button>
 
       <button

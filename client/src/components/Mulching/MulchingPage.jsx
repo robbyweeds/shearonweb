@@ -13,6 +13,9 @@ import {
 const SECTION_META = {
   common: {
     title: "Hand - Common Areas - Sq/ft",
+    shortTitle: "Common Areas",
+    accent: "#4f8f6f",
+    tint: "#eef6f1",
     itemLabels: ["Area #1", "Area #2", "Area #3"],
     sqftLabel: "Sq/Ft",
     equipmentLabel: "SM PWR",
@@ -20,6 +23,9 @@ const SECTION_META = {
   },
   homes: {
     title: "Hand - Homes - # of Homes",
+    shortTitle: "Homes",
+    accent: "#527aa3",
+    tint: "#eef4fb",
     itemLabels: ["Home Size #1", "Home Size #2", "Home Size #3"],
     sqftLabel: "Sq/Ft per Home",
     equipmentLabel: "SM PWR",
@@ -27,6 +33,9 @@ const SECTION_META = {
   },
   trees: {
     title: "Trees - # of Trees",
+    shortTitle: "Trees",
+    accent: "#8b7a3e",
+    tint: "#f8f4e8",
     itemLabels: ["Tree Rings", "Tree Rings", "Tree Rings"],
     sqftLabel: "Qty",
     equipmentLabel: "SM PWR",
@@ -34,6 +43,9 @@ const SECTION_META = {
   },
   finn: {
     title: "Finn - Sq/ft",
+    shortTitle: "Finn",
+    accent: "#8a5f8f",
+    tint: "#f5eef7",
     itemLabels: ["Area #1", "Area #2", "Area #3"],
     sqftLabel: "Sq/Ft",
     equipmentLabel: "HELPER",
@@ -127,6 +139,22 @@ export default function MulchingPage({ tableId, onDelete }) {
   };
   const summaryLabelStyle = { ...cellStyle, fontWeight: "bold", textAlign: "right", background: "#f3f3f3" };
   const summaryValueStyle = { ...cellStyle, fontWeight: "bold", background: "#eef" };
+  const sectionTitleStyle = (meta) => ({
+    ...cellStyle,
+    textAlign: "left",
+    fontWeight: "bold",
+    padding: "8px 10px",
+    background: meta.tint,
+    borderTop: `3px solid ${meta.accent}`,
+    borderLeft: `6px solid ${meta.accent}`,
+    color: "#26332c",
+  });
+  const sectionHeaderStyle = (meta) => ({
+    ...cellStyle,
+    background: meta.tint,
+    borderBottom: `2px solid ${meta.accent}`,
+    color: "#1f2a24",
+  });
 
   const numberInput = (value, onChange, step = "0.1") => (
     <input
@@ -156,6 +184,16 @@ export default function MulchingPage({ tableId, onDelete }) {
     />
   );
 
+  const loaderDayOptions = Object.keys(mulchingRates.loaderManHours).sort(
+    (a, b) => Number(a) - Number(b)
+  );
+
+  const loaderDaysSelect = (value, onChange) => (
+    <select value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} style={selectStyle}>
+      {loaderDayOptions.map((key) => <option key={key} value={key}>{key}</option>)}
+    </select>
+  );
+
   const renderAreaInputRow = (sectionKey) => {
     const section = mergedData.sections[sectionKey];
     const meta = SECTION_META[sectionKey];
@@ -176,7 +214,7 @@ export default function MulchingPage({ tableId, onDelete }) {
                 {Object.keys(mulchingRates.smPowerManHours).map((key) => <option key={key}>{key}</option>)}
               </select>
             </td>
-            <td style={cellStyle}>{numberInput(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value), "0.1")}</td>
+            <td style={cellStyle}>{loaderDaysSelect(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value))}</td>
             <td style={cellStyle}></td>
             <td style={summaryLabelStyle}>Price per Yard</td>
             <td style={summaryValueStyle}>{totals.sections[sectionKey].pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.sections[sectionKey].pricePerYard)}</td>
@@ -211,7 +249,7 @@ export default function MulchingPage({ tableId, onDelete }) {
                 {Object.keys(mulchingRates.smPowerManHours).map((key) => <option key={key}>{key}</option>)}
               </select>
             </td>
-            <td style={cellStyle}>{numberInput(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value), "0.1")}</td>
+            <td style={cellStyle}>{loaderDaysSelect(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value))}</td>
             <td style={cellStyle}></td>
             <td style={summaryLabelStyle}>Price per Yard</td>
             <td style={summaryValueStyle}>{totals.sections[sectionKey].pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.sections[sectionKey].pricePerYard)}</td>
@@ -248,7 +286,7 @@ export default function MulchingPage({ tableId, onDelete }) {
             </select>
           )}
         </td>
-        <td style={cellStyle}>{numberInput(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value), "0.1")}</td>
+        <td style={cellStyle}>{loaderDaysSelect(section.loaderHours, (value) => updateSectionField(sectionKey, "loaderHours", value))}</td>
         <td style={cellStyle}></td>
         <td style={summaryLabelStyle}>Price per Yard</td>
         <td style={summaryValueStyle}>{totals.sections[sectionKey].pricePerYard == null ? "#DIV/0!" : formatCurrency(totals.sections[sectionKey].pricePerYard)}</td>
@@ -341,14 +379,22 @@ export default function MulchingPage({ tableId, onDelete }) {
 
     return (
       <React.Fragment key={sectionKey}>
-        <tr><td colSpan={10} style={{ ...cellStyle, textAlign: "left", fontWeight: "bold", paddingTop: "18px" }}>{meta.title}</td></tr>
         <tr>
-          <th style={cellStyle}>ITEM</th>
-          <th style={cellStyle}>MISC</th>
-          {meta.itemLabels.map((label) => <th key={label} style={cellStyle}>{label}</th>)}
-          <th style={cellStyle}>{meta.equipmentLabel}</th>
-          <th style={cellStyle}>Loader Days</th>
-          <th style={cellStyle}>MULCH</th>
+          <td colSpan={10} style={{ border: "none", height: sectionKey === "common" ? "0" : "12px", padding: 0 }}></td>
+        </tr>
+        <tr>
+          <td colSpan={10} style={sectionTitleStyle(meta)}>
+            <span style={{ fontSize: "13px", marginRight: "8px" }}>{meta.shortTitle}</span>
+            <span style={{ color: "#58645d", fontWeight: 600 }}>{meta.title}</span>
+          </td>
+        </tr>
+        <tr>
+          <th style={sectionHeaderStyle(meta)}>ITEM</th>
+          <th style={sectionHeaderStyle(meta)}>MISC</th>
+          {meta.itemLabels.map((label) => <th key={label} style={sectionHeaderStyle(meta)}>{label}</th>)}
+          <th style={sectionHeaderStyle(meta)}>{meta.equipmentLabel}</th>
+          <th style={sectionHeaderStyle(meta)}>Loader Days</th>
+          <th style={sectionHeaderStyle(meta)}>MULCH</th>
           <th style={summaryLabelStyle}>HRS/OCC</th>
           <th style={summaryValueStyle}>{sectionTotals.hoursPerOcc.toFixed(1)}</th>
         </tr>

@@ -22,10 +22,14 @@ export default function SimpleServiceForm({ serviceKey, title }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const saveService = () => {
     updateService(serviceKey, formData);
     navigate("/services");
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    saveService();
   };
 
   const handleReset = () => {
@@ -39,6 +43,15 @@ export default function SimpleServiceForm({ serviceKey, title }) {
         <div className="page-title">
           <p>Service Entry</p>
           <h1>{title}</h1>
+        </div>
+
+        <div className="service-top-actions">
+          <button className="save-project-button" onClick={saveService} type="button">
+            Save {title}
+          </button>
+          <button className="secondary-button" onClick={() => navigate(-1)} type="button">
+            Back
+          </button>
         </div>
 
         <form className="stacked-form" onSubmit={handleSubmit}>
@@ -65,7 +78,7 @@ export default function SimpleServiceForm({ serviceKey, title }) {
           </label>
 
           <div className="service-page-actions form-actions">
-            <button type="submit">Save {title}</button>
+            <button className="save-project-button" type="submit">Save {title}</button>
             <button className="danger-button" onClick={handleReset} type="button">
               Reset
             </button>

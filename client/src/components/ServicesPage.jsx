@@ -14,6 +14,15 @@ const API_URL = process.env.REACT_APP_API_URL || "";
 const money = formatCurrency;
 const SAVED_RATES_KEY = "__rates";
 
+const formatShortDate = (value) => {
+  if (!value) return "Not set";
+
+  const [year, month, day] = String(value).split("T")[0].split("-");
+  if (!year || !month || !day) return value;
+
+  return `${month}/${day}/${year.slice(-2)}`;
+};
+
 export default function ServicesPage() {
   const navigate = useNavigate();
   const { currentServices, updateService, getAllServices, currentRates } =
@@ -59,6 +68,7 @@ export default function ServicesPage() {
   const deleteEdging = () => updateService("edging", null);
   const deleteBedMaintenance = () => updateService("bedMaintenance", null);
   const deleteLeaves = () => updateService("leaves", null);
+  const deleteSpringCleanup = () => updateService("springCleanup", null);
   const deleteTurfApp = (id) =>
     updateService(
       "turfApp",
@@ -222,7 +232,7 @@ export default function ServicesPage() {
       if (calc && Number(calc.occ || 0) > 0) {
         rows.push({
           id: "edging",
-          label: "Edging",
+          label: entry.data?.name || "Edging",
           occ: calc.occ,
           pricePerOcc: calc.pricePerOcc,
           total: calc.finalTotal,
@@ -240,7 +250,7 @@ export default function ServicesPage() {
       if (calc && Number(calc.occ || 0) > 0) {
         rows.push({
           id: "bedMaintenance",
-          label: "Bed Maintenance",
+          label: entry.data?.name || "Bed Maintenance",
           occ: calc.occ,
           pricePerOcc: calc.pricePerOcc,
           total: calc.finalTotal,
@@ -257,6 +267,17 @@ export default function ServicesPage() {
         pricePerOcc: null,
         total: null,
         onDelete: deleteLeaves,
+      });
+    }
+
+    if (currentServices.springCleanup) {
+      rows.push({
+        id: "springCleanup",
+        label: currentServices.springCleanup.area || "Spring Cleanup",
+        occ: currentServices.springCleanup.quantity || "Saved",
+        pricePerOcc: null,
+        total: null,
+        onDelete: deleteSpringCleanup,
       });
     }
 
@@ -380,7 +401,7 @@ export default function ServicesPage() {
           </div>
           <div className="header-actions">
             <button className="secondary-button" onClick={() => navigate("/")} type="button">Main Page</button>
-            <button onClick={handleSaveProject} type="button">
+            <button className="save-project-button" onClick={handleSaveProject} type="button">
               Save Project
             </button>
           </div>
@@ -389,7 +410,7 @@ export default function ServicesPage() {
         <div className="summary-strip">
           <div>
             <span>Date</span>
-            <strong>{project.date || "Not set"}</strong>
+            <strong>{formatShortDate(project.date)}</strong>
           </div>
           <div>
             <label className="summary-field-label" htmlFor="project-acres">
@@ -417,6 +438,7 @@ export default function ServicesPage() {
           <button onClick={() => navigate("/services/mulching")} type="button">Mulching</button>
           <button onClick={() => navigate("/services/pruning")} type="button">Pruning</button>
           <button onClick={() => navigate("/services/leaves")} type="button">Leaves</button>
+          <button onClick={() => navigate("/services/spring-cleanup")} type="button">Spring Cleanup</button>
           <button onClick={() => navigate("/services/turf-app")} type="button">Turf App</button>
           <button onClick={() => navigate("/services/flowers")} type="button">Flowers</button>
           <button onClick={() => navigate("/services/extras")} type="button">Extras</button>
@@ -425,7 +447,7 @@ export default function ServicesPage() {
         <section className="summary-panel">
           <div className="section-heading">
             <span>Service Summary</span>
-            <strong>{summaryRows.length} saved</strong>
+            <strong>{summaryRows.length} services</strong>
           </div>
 
           {summaryRows.length === 0 ? (

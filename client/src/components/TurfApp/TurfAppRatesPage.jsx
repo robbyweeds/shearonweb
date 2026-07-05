@@ -206,7 +206,7 @@ export default function TurfAppRatesPage() {
         </tbody>
       </table>
 
-      <h3>Hand Factors</h3>
+      <h3>Hand Hours per Acre</h3>
       <table border="1" style={{ ...tableStyle, maxWidth: "620px" }}>
         <thead>
           <tr>
@@ -316,17 +316,10 @@ export default function TurfAppRatesPage() {
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "2rem", flexWrap: "wrap" }}>
         <button
+          className="save-project-button"
           onClick={handleSaveRates}
-          style={{
-            padding: "10px 24px",
-            backgroundColor: "#28a745",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
-          }}
         >
-          Save Rates
+          Save Turf App Rates
         </button>
 
         <button

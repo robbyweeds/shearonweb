@@ -6,6 +6,7 @@ import { useServiceContext } from "../context/ServiceContext";
 import { formatCurrency } from "../utils/formatters";
 
 const INITIAL = {
+  name: "Edging",
   qtyUnit: { EDGER: 0, BLOWER: 0 },
   unitPrice: { EDGER: 55, BLOWER: 55 },
   summary: { numOccurrences: 0 },
@@ -22,16 +23,19 @@ export default function EdgingTable() {
 
   const array = Array.isArray(currentServices.edging)
     ? currentServices.edging
-    : [];
+    : currentServices.edging
+      ? [currentServices.edging]
+      : [];
 
   const table =
-    array.find((t) => t.id === tableId) || { id: tableId, data: INITIAL };
+    array.find((t) => t.id === tableId) || array[0] || { id: tableId, data: INITIAL };
 
   // Merge saved + defaults
   const data = useMemo(() => {
     return {
       ...INITIAL,
       ...table.data,
+      name: table.data.name || INITIAL.name,
       qtyUnit: {
         ...INITIAL.qtyUnit,
         ...(table.data.qtyUnit || {}),
@@ -83,8 +87,22 @@ export default function EdgingTable() {
     });
   };
 
+  const handleNameChange = (e) => {
+    save({ ...data, name: e.target.value });
+  };
+
   return (
-    <table
+    <div>
+      <label style={{ marginBottom: "0.5rem" }}>
+        <span>Table Name</span>
+        <input
+          type="text"
+          value={data.name}
+          onChange={handleNameChange}
+          style={{ maxWidth: "320px", padding: "6px" }}
+        />
+      </label>
+      <table
       border="1"
       style={{
         width: "100%",
@@ -162,6 +180,7 @@ export default function EdgingTable() {
           </td>
         </tr>
       </tbody>
-    </table>
+      </table>
+    </div>
   );
 }

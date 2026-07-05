@@ -116,8 +116,8 @@ export default function MulchingRatesPage() {
       {renderSingleRowTable("Finn Helper", "finnHelper", "Helper hrs per Finn hr", "0.01")}
 
       <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <button onClick={handleSave} style={{ padding: "0.4rem 0.75rem", background: "#4caf50", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
-          Save
+        <button className="save-project-button" onClick={handleSave}>
+          Save Mulching Rates
         </button>
         <button onClick={() => setLocalRates(savedMulchingRates)} style={{ padding: "0.4rem 0.75rem", border: "1px solid #ccc", borderRadius: "4px", cursor: "pointer" }}>
           Cancel

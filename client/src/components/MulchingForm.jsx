@@ -67,6 +67,15 @@ export default function MulchingForm() {
     <div className="service-entry-page">
       <h2>Mulching</h2>
 
+      <div className="service-top-actions">
+        <button className="save-project-button" onClick={handleSave} type="button">
+          Save Mulching
+        </button>
+        <button className="secondary-button" onClick={() => navigate(-1)} type="button">
+          Back
+        </button>
+      </div>
+
       {tables.map((t, index) => (
         <MulchingPage
           key={t.id}
@@ -84,8 +93,8 @@ export default function MulchingForm() {
       </div>
 
       <div className="service-page-actions">
-        <button onClick={handleSave} type="button">
-          Save
+        <button className="save-project-button" onClick={handleSave} type="button">
+          Save Mulching
         </button>
         <button className="danger-button" onClick={handleReset} type="button">
           Reset

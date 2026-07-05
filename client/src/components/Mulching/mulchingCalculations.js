@@ -6,6 +6,11 @@ export { formatCurrency } from "../../utils/formatters";
 const round1 = (value) => Number((Math.round(Number(value || 0) * 10) / 10).toFixed(1));
 const round2 = (value) => Number(Number(value || 0).toFixed(2));
 
+function computeLoaderHours(loaderDays) {
+  const roundedDays = round2(loaderDays);
+  return roundedDays === 0 ? 0 : round2((8 * roundedDays) + 2);
+}
+
 export function mergeMulchingRates(rates = {}) {
   return {
     ...DEFAULT_MULCHING_RATES,
@@ -117,7 +122,8 @@ export function computeMulchingSection(sectionKey, section, ratesInput = {}) {
   });
 
   const miscHours = Number(section.miscHours || 0);
-  const loaderHours = Number(section.loaderHours || 0);
+  const loaderDays = Number(section.loaderHours || 0);
+  const loaderHours = computeLoaderHours(loaderDays);
   const extraKey = sectionKey === "finn" ? "HELPER" : "SM_PWR";
   const extraRateKey = sectionKey === "finn" ? "HELPER" : "SM_PWR";
   let extraHours = 0;
@@ -152,6 +158,7 @@ export function computeMulchingSection(sectionKey, section, ratesInput = {}) {
     areaHours: round2(areaHours),
     extraKey,
     extraHours: round2(extraHours),
+    loaderDays,
     loaderHours,
     mulchYards: round1(mulchYards),
     hoursPerOcc: round2(hoursPerOcc),
