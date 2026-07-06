@@ -2,17 +2,19 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceContext } from "../context/ServiceContext";
 
-import { INITIAL_MOWING_DATA } from "./Mowing/mowingDefaults";
+import { DISPLAY_KEYS, INITIAL_MOWING_DATA } from "./Mowing/mowingDefaults";
 import { computeHours, computeTotals } from "./Mowing/mowingCalculations";
-import { computeMulchingTotals } from "./Mulching/mulchingCalculations";
-import { DEFAULT_MULCHING_RATES } from "./Mulching/mulchingDefaults";
+import { computeMulchingTotals, mergeMulchingData } from "./Mulching/mulchingCalculations";
+import { DEFAULT_MULCHING_RATES, MULCH_AREA_KEYS, MULCH_SECTION_KEYS } from "./Mulching/mulchingDefaults";
 import { computeTurfAppTotals } from "./TurfApp/turfAppCalculations";
-import { DEFAULT_TURF_APP_RATES, INITIAL_TURF_APP_DATA } from "./TurfApp/turfAppDefaults";
+import { DEFAULT_TURF_APP_RATES, INITIAL_TURF_APP_DATA, TURF_COLUMNS, TURF_LABOR_KEYS } from "./TurfApp/turfAppDefaults";
 import { formatCurrency } from "../utils/formatters";
 import { computeExtrasTotals, mergeExtrasTable } from "./Extras/extrasCalculations";
+import { EXTRA_KEYS, EXTRA_LABELS, EXTRA_LABOR_KEYS } from "./Extras/extrasDefaults";
 import { computeFlowersTotals, mergeFlowersTable } from "./Flowers/flowersCalculations";
+import { FLOWER_KEYS, FLOWER_LABELS, FLOWER_LABOR_KEYS } from "./Flowers/flowersDefaults";
 import { computeLeavesTotals, mergeLeavesData, mergeLeavesRates } from "./Leaves/leavesCalculations";
-import { DEFAULT_LEAVES_RATES } from "./Leaves/leavesDefaults";
+import { DEFAULT_LEAVES_RATES, LEAVES_KEYS, LEAVES_LABELS } from "./Leaves/leavesDefaults";
 import { computeSpringCleanupTableTotals, mergeSpringCleanupData } from "./SpringCleanup/springCleanupCalculations";
 import { SPRING_CLEANUP_TABLES } from "./SpringCleanup/springCleanupDefaults";
 
@@ -28,6 +30,8 @@ const formatShortDate = (value) => {
 
   return `${month}/${day}/${year.slice(-2)}`;
 };
+
+const formatLastModified = (value, fallback) => formatShortDate(value || fallback);
 
 const filenameSafe = (value) =>
   String(value || "service-preview")
@@ -61,6 +65,57 @@ const addPdfLine = (commands, x1, y1, x2, y2) => {
 };
 
 const byteLength = (value) => new TextEncoder().encode(value).length;
+
+const downloadCsv = async (rows, filename) => {
+  const csv = rows
+    .map((row) =>
+      row
+        .map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"')
+        .join(",")
+    )
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+
+  if (window.showSaveFilePicker) {
+    try {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [
+          {
+            description: "CSV file",
+            accept: { "text/csv": [".csv"] },
+          },
+        ],
+      });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      console.error(err);
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const compactNumber = (value) => {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return "";
+  if (num === 0) return "";
+  return Number(num.toFixed(2));
+};
 
 const downloadPdfBlob = async (blob, filename) => {
   if (window.showSaveFilePicker) {
@@ -97,7 +152,7 @@ const downloadPdfBlob = async (blob, filename) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-const buildServicePreviewPdf = ({ propertyName, date, acres, summaryRows, projectTotal }) => {
+const buildServicePreviewPdf = ({ propertyName, date, acres, lastModified, summaryRows, projectTotal }) => {
   const rows = summaryRows.map((row) => ({
     label: truncatePdfText(row.label, 34),
     occ: String(row.occ ?? ""),
@@ -119,8 +174,9 @@ const buildServicePreviewPdf = ({ propertyName, date, acres, summaryRows, projec
       addPdfText(commands, acres, 244, 696, 12);
       addPdfText(commands, "Date", 408, 712, 8);
       addPdfText(commands, date, 408, 696, 12);
-      addPdfLine(commands, 40, 676, 572, 676);
-      y = 642;
+      addPdfText(commands, "Last modified: " + lastModified, 408, 676, 8);
+      addPdfLine(commands, 40, 662, 572, 662);
+      y = 628;
     } else {
       addPdfText(commands, propertyName + " Service Preview", 40, 746, 18);
       y = 712;
@@ -207,6 +263,7 @@ export default function ServicesPage() {
     projectName: "",
     date: "",
     acres: "",
+    lastModified: "",
   });
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [draftProjectName, setDraftProjectName] = useState("");
@@ -273,6 +330,8 @@ export default function ServicesPage() {
     );
 
   const acresPerHour = currentRates?.mowingFactors?.acresPerHour || {};
+  const smPwrEfficiency = currentRates?.mowingFactors?.smPwrEfficiency || {};
+  const smPwrAllocation = currentRates?.mowingFactors?.smPwrAllocation || {};
   const mowingDollars = currentRates?.mowingDollars || {};
 
   const computeMowingPreview = (entry) => {
@@ -297,7 +356,7 @@ export default function ServicesPage() {
       },
     };
 
-    const qty = computeHours(merged, acresPerHour);
+    const qty = computeHours(merged, acresPerHour, smPwrEfficiency, smPwrAllocation);
     const totals = computeTotals(merged, qty, mowingDollars);
     return { merged, totals };
   };
@@ -616,6 +675,239 @@ export default function ServicesPage() {
     0
   );
 
+  const buildPlanHoursRows = () => {
+    const rows = [
+      ["Project", project.projectName || "New Project"],
+      ["Date", formatShortDate(project.date)],
+      ["Turf Acres", project.acres || "Not set"],
+      ["Last Modified", formatLastModified(project.lastModified, project.date)],
+    ];
+    const columns = ["Page", "Service", "Item", "Qty / Occ", "Unit", "Occ", "Total Qty", "$/Occ", "Total $", "Notes"];
+    let activePage = "";
+
+    const ensurePage = (page) => {
+      if (activePage === page) return;
+      rows.push([]);
+      rows.push([page]);
+      rows.push(columns);
+      activePage = page;
+    };
+
+    const addLine = ({ page, service, item, qty, unit = "hrs", occ, pricePerOcc, total, notes }) => {
+      const qtyNum = Number(qty || 0);
+      const priceNum = Number(pricePerOcc || 0);
+      const totalNum = total == null ? priceNum * Number(occ || 0) : Number(total || 0);
+      if (qtyNum === 0 && priceNum === 0 && totalNum === 0) return;
+
+      ensurePage(page);
+      rows.push([
+        page,
+        service,
+        item,
+        compactNumber(qtyNum),
+        unit,
+        compactNumber(occ),
+        compactNumber(qtyNum * Number(occ || 0)),
+        priceNum ? money(priceNum) : "",
+        totalNum ? money(totalNum) : "",
+        notes || "",
+      ]);
+    };
+
+    const addTotal = ({ page, service, occ, hoursPerOcc, pricePerOcc, total, notes }) => {
+      ensurePage(page);
+      rows.push([
+        page,
+        service,
+        "SERVICE TOTAL",
+        compactNumber(hoursPerOcc),
+        "hrs",
+        compactNumber(occ),
+        compactNumber(Number(hoursPerOcc || 0) * Number(occ || 0)),
+        money(pricePerOcc || 0),
+        money(total || 0),
+        notes || "",
+      ]);
+    };
+
+    const addQtyLines = ({ page, service, occ, qty, keys, labels = {}, hourKeys = keys, rowTotals = {}, notes = {} }) => {
+      keys.forEach((key) => {
+        const isHour = hourKeys.includes(key);
+        addLine({
+          page,
+          service,
+          item: labels[key] || key,
+          qty: qty[key],
+          unit: isHour ? "hrs" : "qty",
+          occ,
+          pricePerOcc: rowTotals[key],
+          notes: notes[key],
+        });
+      });
+    };
+
+    const mowingLabels = {
+      MISC_HRS: "Misc Hrs",
+      "72-area1": "72 Area 1",
+      "72-area2": "72 Area 2",
+      "60-area1": "60 Area 1",
+      "60-area2": "60 Area 2",
+      "48-area1": "48 Area 1",
+      "48-area2": "48 Area 2",
+      TRIMMER: "Trimmer",
+      BLOWER: "Blower",
+      ROTARY: "Rotary",
+      SPECIALTY: "Specialty",
+      "5111": "5111",
+    };
+
+    (Array.isArray(currentServices.mowing) ? currentServices.mowing : []).forEach((entry) => {
+      const { merged, totals } = computeMowingPreview(entry);
+      const occ = Number(merged.summary?.numOccurrences || 0);
+      if (occ <= 0) return;
+      const qty = computeHours(merged, acresPerHour, smPwrEfficiency, smPwrAllocation);
+      const acreNotes = Object.fromEntries(
+        DISPLAY_KEYS.map((key) => [key, merged.acres?.[key] ? compactNumber(merged.acres[key]) + " acres" : ""])
+      );
+
+      addQtyLines({ page: "Mowing", service: merged.name || "Mowing Area", occ, qty, keys: DISPLAY_KEYS, labels: mowingLabels, rowTotals: totals.rowTotals, notes: acreNotes });
+      addTotal({ page: "Mowing", service: merged.name || "Mowing Area", occ, hoursPerOcc: totals.totalHours, pricePerOcc: totals.adjustedOcc, total: totals.final, notes: merged.tableAcres ? compactNumber(merged.tableAcres) + " input acres" : "" });
+    });
+
+    if (currentServices.edging) {
+      const entry = Array.isArray(currentServices.edging) ? currentServices.edging[0] : currentServices.edging;
+      const calc = computeEdgingTotals(entry);
+      const occ = Number(calc?.occ || 0);
+      if (occ > 0) {
+        const qty = entry.data?.qtyUnit || {};
+        const rowTotals = { EDGER: Number(qty.EDGER || 0) * Number(entry.data?.unitPrice?.EDGER || 0), BLOWER: Number(qty.BLOWER || 0) * Number(entry.data?.unitPrice?.BLOWER || 0) };
+        addQtyLines({ page: "Mowing", service: entry.data?.name || "Edging", occ, qty, keys: ["EDGER", "BLOWER"], rowTotals });
+        addTotal({ page: "Mowing", service: entry.data?.name || "Edging", occ, hoursPerOcc: Number(qty.EDGER || 0) + Number(qty.BLOWER || 0), pricePerOcc: calc.pricePerOcc, total: calc.finalTotal });
+      }
+    }
+
+    if (currentServices.bedMaintenance) {
+      const entry = Array.isArray(currentServices.bedMaintenance) ? currentServices.bedMaintenance[0] : currentServices.bedMaintenance;
+      const calc = computeBedTotals(entry);
+      const occ = Number(calc?.occ || 0);
+      if (occ > 0) {
+        const qty = entry.data?.qtyUnit || {};
+        const rowTotals = { HAND: Number(qty.HAND || 0) * Number(entry.data?.unitPrice?.HAND || 0), BACKPACK: Number(qty.BACKPACK || 0) * Number(entry.data?.unitPrice?.BACKPACK || 0), ROUNDUP: Number(qty.ROUNDUP || 0) * Number(entry.data?.unitPrice?.ROUNDUP || 0) };
+        addQtyLines({ page: "Mowing", service: entry.data?.name || "Bed Maintenance", occ, qty, keys: ["HAND", "BACKPACK", "ROUNDUP"], rowTotals });
+        addTotal({ page: "Mowing", service: entry.data?.name || "Bed Maintenance", occ, hoursPerOcc: Number(qty.HAND || 0) + Number(qty.BACKPACK || 0) + Number(qty.ROUNDUP || 0), pricePerOcc: calc.pricePerOcc, total: calc.finalTotal });
+      }
+    }
+
+    (Array.isArray(currentServices.mulching) ? currentServices.mulching : []).forEach((entry, index) => {
+      const merged = mergeMulchingData({ ...(entry.data || {}), name: entry.data?.name || "Mulch #" + (index + 1) });
+      const rates = currentRates?.mulchingRates || DEFAULT_MULCHING_RATES;
+      const totals = computeMulchingTotals(merged, rates);
+      const occ = Number(totals.occurrences || 0);
+      if (occ <= 0) return;
+
+      MULCH_SECTION_KEYS.forEach((sectionKey) => {
+        const section = merged.sections[sectionKey];
+        const sectionTotals = totals.sections[sectionKey];
+        if (!sectionTotals || (Number(sectionTotals.hoursPerOcc || 0) === 0 && Number(sectionTotals.totalOcc || 0) === 0)) return;
+        const service = merged.name + " - " + section.title;
+        const qty = { MISC: sectionTotals.miscHours, area1: sectionTotals.areaTotals.area1.hours, area2: sectionTotals.areaTotals.area2.hours, area3: sectionTotals.areaTotals.area3.hours, [sectionTotals.extraKey]: sectionTotals.extraHours, LOADER: sectionTotals.loaderHours, MULCH: sectionTotals.mulchYards };
+        const labels = { MISC: "Misc", area1: "Area 1", area2: "Area 2", area3: "Area 3", SM_PWR: "Sm Pwr", HELPER: "Helper", LOADER: "Loader", MULCH: "Mulch" };
+        const notes = Object.fromEntries(MULCH_AREA_KEYS.map((areaKey) => [areaKey, compactNumber(sectionTotals.areaTotals[areaKey].sqft) + " sqft"]));
+        addQtyLines({ page: "Mulching", service, occ, qty, keys: ["MISC", "area1", "area2", "area3", sectionTotals.extraKey, "LOADER", "MULCH"], labels, hourKeys: ["MISC", "area1", "area2", "area3", sectionTotals.extraKey, "LOADER"], rowTotals: sectionTotals.rowTotals, notes });
+        addTotal({ page: "Mulching", service, occ, hoursPerOcc: sectionTotals.hoursPerOcc, pricePerOcc: sectionTotals.totalOcc, total: sectionTotals.totalOcc * occ });
+      });
+    });
+
+    (Array.isArray(currentServices.pruning) ? currentServices.pruning : []).forEach((entry, index) => {
+      const data = entry.data || {};
+      const calc = computePruningTotals(entry);
+      const occ = Number(calc?.occ || 0);
+      if (occ <= 0) return;
+      const service = data.name || "Pruning #" + (index + 1);
+      const qty = data.qty || {};
+      const rowTotals = Object.fromEntries(["MISC", "HAND", "SHEARS", "CLEANUP", "CHAINSAW"].map((key) => [key, Number(qty[key] || 0) * Number(data.unitPrice?.[key] || 0)]));
+      addQtyLines({ page: "Pruning", service, occ, qty, keys: ["MISC", "HAND", "SHEARS", "CLEANUP", "CHAINSAW"], rowTotals });
+      addTotal({ page: "Pruning", service, occ, hoursPerOcc: Object.values(qty).reduce((sum, value) => sum + Number(value || 0), 0), pricePerOcc: calc.pricePerOcc, total: calc.totalDollar });
+    });
+
+    if (currentServices.leaves) {
+      const merged = mergeLeavesData(currentServices.leaves);
+      const leavesRates = mergeLeavesRates(currentRates?.leavesRates || DEFAULT_LEAVES_RATES);
+      const totals = computeLeavesTotals(merged, leavesRates);
+      const occ = Number(merged.occurrences || 0);
+      if (occ > 0) {
+        addQtyLines({ page: "Fall Cleanup", service: merged.name || "Fall Cleanup", occ, qty: totals.qtyUnit, keys: LEAVES_KEYS, labels: LEAVES_LABELS, rowTotals: totals.rowTotals });
+        addTotal({ page: "Fall Cleanup", service: merged.name || "Fall Cleanup", occ, hoursPerOcc: totals.hoursPerOcc, pricePerOcc: totals.dollarsPerOcc, total: totals.final, notes: compactNumber(merged.acres) + " acres" });
+      }
+    }
+
+    if (currentServices.springCleanup) {
+      const merged = mergeSpringCleanupData(currentServices.springCleanup);
+      Object.entries(SPRING_CLEANUP_TABLES).forEach(([tableKey, definition]) => {
+        const table = merged.tables[tableKey];
+        const totals = computeSpringCleanupTableTotals(tableKey, table);
+        const occ = Number(table.occurrences || 0);
+        if (occ <= 0) return;
+        addQtyLines({ page: "Spring Cleanup", service: definition.title, occ, qty: table.qty || {}, keys: definition.keys, labels: definition.labels, hourKeys: definition.hourKeys, rowTotals: totals.rowTotals });
+        addTotal({ page: "Spring Cleanup", service: definition.title, occ, hoursPerOcc: totals.hoursPerOcc, pricePerOcc: totals.dollarsPerOcc, total: totals.totalDollars });
+      });
+      merged.extraTables.forEach((table) => {
+        const definition = SPRING_CLEANUP_TABLES[table.definitionKey];
+        const totals = computeSpringCleanupTableTotals(table.definitionKey, table);
+        const occ = Number(table.occurrences || 0);
+        if (occ <= 0) return;
+        const service = table.title || definition.title;
+        addQtyLines({ page: "Spring Cleanup", service, occ, qty: table.qty || {}, keys: definition.keys, labels: definition.labels, hourKeys: definition.hourKeys, rowTotals: totals.rowTotals });
+        addTotal({ page: "Spring Cleanup", service, occ, hoursPerOcc: totals.hoursPerOcc, pricePerOcc: totals.dollarsPerOcc, total: totals.totalDollars });
+      });
+    }
+
+    (Array.isArray(currentServices.turfApp) ? currentServices.turfApp : []).forEach((entry, index) => {
+      const merged = { ...INITIAL_TURF_APP_DATA, ...(entry.data || {}), name: entry.data?.name || "Turf Application #" + (index + 1), qtyUnit: { ...INITIAL_TURF_APP_DATA.qtyUnit, ...(entry.data?.qtyUnit || {}) }, summary: { ...INITIAL_TURF_APP_DATA.summary, ...(entry.data?.summary || {}) } };
+      const rates = { ...DEFAULT_TURF_APP_RATES, ...(currentRates?.turfAppRates || {}) };
+      const totals = computeTurfAppTotals(merged, rates);
+      const occ = Number(merged.summary?.numOccurrences || 0);
+      if (occ <= 0) return;
+      const labels = Object.fromEntries(TURF_COLUMNS.map((col) => [col.key, col.key === "OTHER_MATERIAL" ? merged.otherMaterialName || col.label : col.label]));
+      addQtyLines({ page: "Turf App", service: merged.name || "Turf Application", occ, qty: totals.qtyUnit, keys: TURF_COLUMNS.map((col) => col.key), labels, hourKeys: TURF_LABOR_KEYS, rowTotals: totals.rowTotals, notes: { FERTILIZER: merged.fertilizerOption, OTHER_MATERIAL: merged.otherMaterialName } });
+      addTotal({ page: "Turf App", service: merged.name || "Turf Application", occ, hoursPerOcc: totals.hoursPerOcc, pricePerOcc: totals.totalOcc, total: totals.final, notes: compactNumber(merged.acres) + " acres" });
+    });
+
+    (Array.isArray(currentServices.flowers) ? currentServices.flowers : []).forEach((entry, index) => {
+      const merged = mergeFlowersTable({ ...(entry.data || {}), name: entry.data?.name || "Flowers #" + (index + 1) });
+      const totals = computeFlowersTotals(merged);
+      const occ = Number(merged.occurrences || 0);
+      if (occ <= 0) return;
+      const labels = { ...FLOWER_LABELS, ...(merged.customLabels || {}) };
+      addQtyLines({ page: "Flowers", service: merged.name || "Flowers", occ, qty: merged.qty, keys: FLOWER_KEYS, labels, hourKeys: FLOWER_LABOR_KEYS, rowTotals: totals.rowTotals });
+      addTotal({ page: "Flowers", service: merged.name || "Flowers", occ, hoursPerOcc: totals.qtyPerOcc, pricePerOcc: totals.dollarsPerOcc, total: totals.totalDollars });
+    });
+
+    (Array.isArray(currentServices.extras) ? currentServices.extras : []).forEach((entry, index) => {
+      const merged = mergeExtrasTable({ ...(entry.data || {}), name: entry.data?.name || "Extras #" + (index + 1) });
+      const totals = computeExtrasTotals(merged);
+      const occ = Number(merged.occurrences || 0);
+      if (occ <= 0) return;
+      const labels = { ...EXTRA_LABELS, ...(merged.customLabels || {}) };
+      addQtyLines({ page: "Extras", service: merged.name || "Extras", occ, qty: merged.qty, keys: EXTRA_KEYS, labels, hourKeys: EXTRA_LABOR_KEYS, rowTotals: totals.rowTotals });
+      addTotal({ page: "Extras", service: merged.name || "Extras", occ, hoursPerOcc: totals.qtyPerOcc, pricePerOcc: totals.dollarsPerOcc, total: totals.totalDollars });
+    });
+
+    return rows;
+  };
+
+  const handleDownloadPlanHours = async () => {
+    if (summaryRows.length === 0) {
+      alert("Add a service before downloading plan hours.");
+      return;
+    }
+
+    await downloadCsv(
+      buildPlanHoursRows(),
+      filenameSafe(project.projectName || "New Project") + "-plan-hours.csv"
+    );
+  };
+
   const handleDownloadPreview = async () => {
     if (summaryRows.length === 0) {
       alert("Add a service before downloading the preview.");
@@ -625,10 +917,12 @@ export default function ServicesPage() {
     const propertyName = project.projectName || "New Project";
     const date = formatShortDate(project.date);
     const acres = project.acres || "Not set";
+    const lastModified = formatLastModified(project.lastModified, project.date);
     const pdfBlob = buildServicePreviewPdf({
       propertyName,
       date,
       acres,
+      lastModified,
       summaryRows,
       projectTotal,
     });
@@ -636,6 +930,11 @@ export default function ServicesPage() {
       pdfBlob,
       filenameSafe(propertyName) + "-service-preview.pdf"
     );
+  };
+
+  const handlePreviewDelete = (onDelete) => {
+    if (!window.confirm("Delete this service?")) return;
+    onDelete();
   };
 
   const handleSaveProject = async () => {
@@ -653,6 +952,8 @@ export default function ServicesPage() {
       return;
     }
 
+    const modifiedAt = new Date().toISOString();
+    const projectToSave = { ...project, lastModified: modifiedAt };
     const isExistingProject = Boolean(project.id);
     const url = isExistingProject
       ? `${API_URL}/project/${project.id}`
@@ -662,12 +963,16 @@ export default function ServicesPage() {
       const response = await fetch(url, {
         method: isExistingProject ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project, services: sanitized }),
+        body: JSON.stringify({ project: projectToSave, services: sanitized }),
       });
 
       const json = await response.json();
       if (json.success) {
-        const savedProject = { ...project, id: json.projectId || project.id };
+        const savedProject = {
+          ...projectToSave,
+          id: json.projectId || project.id,
+          lastModified: json.lastModified || modifiedAt,
+        };
         setProject(savedProject);
         localStorage.setItem("project", JSON.stringify(savedProject));
         alert(isExistingProject ? "Project updated" : "Project saved");
@@ -735,6 +1040,10 @@ export default function ServicesPage() {
             />
           </div>
           <div>
+            <span>Last Modified</span>
+            <strong className="summary-small-text">{formatLastModified(project.lastModified, project.date)}</strong>
+          </div>
+          <div>
             <span>Estimated Total</span>
             <strong>{money(projectTotal)}</strong>
           </div>
@@ -762,7 +1071,7 @@ export default function ServicesPage() {
                 onClick={handleDownloadPreview}
                 type="button"
               >
-                Download PDF
+                Download Chart
               </button>
             </div>
           </div>
@@ -793,7 +1102,11 @@ export default function ServicesPage() {
                           <button className="secondary-button compact-button" onClick={row.onEdit} type="button">
                             Edit
                           </button>
-                          <button className="danger-button compact-button" onClick={row.onDelete} type="button">
+                          <button
+                            className="danger-button compact-button"
+                            onClick={() => handlePreviewDelete(row.onDelete)}
+                            type="button"
+                          >
                             Remove
                           </button>
                         </div>
@@ -809,6 +1122,16 @@ export default function ServicesPage() {
                   </tr>
                 </tfoot>
               </table>
+              <div className="button-row" style={{ justifyContent: "flex-end", marginTop: "1rem" }}>
+                <button
+                  className="ghost-button compact-button"
+                  disabled={summaryRows.length === 0}
+                  onClick={handleDownloadPlanHours}
+                  type="button"
+                >
+                  Download Plan Hours
+                </button>
+              </div>
             </div>
           )}
         </section>

@@ -5,10 +5,13 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { DEFAULT_TURF_APP_RATES } from "../components/TurfApp/turfAppDefaults";
 import { DEFAULT_LEAVES_RATES } from "../components/Leaves/leavesDefaults";
+import { DEFAULT_MULCHING_RATES } from "../components/Mulching/mulchingDefaults";
+import { DEFAULT_PRUNING_RATES } from "../components/Pruning/pruningDefaults";
 
 const ServiceContext = createContext(null);
+export const DEFAULT_RATES_STORAGE_KEY = "shearonDefaultRates";
 
-const DEFAULT_MOWING_FACTORS = {
+export const DEFAULT_MOWING_FACTORS = {
     acresPerHour: {
       "72": {
         OBSTACLES: 0.65,
@@ -62,7 +65,7 @@ const DEFAULT_MOWING_FACTORS = {
     },
 };
 
-const DEFAULT_MOWING_DOLLARS = {
+export const DEFAULT_MOWING_DOLLARS = {
     MISC_HRS: 61,
     "72-area1": 51,
     "72-area2": 61,
@@ -75,6 +78,51 @@ const DEFAULT_MOWING_DOLLARS = {
     ROTARY: 55,
     "5111": 100,
 };
+
+export const APP_DEFAULT_RATES = {
+  mowingFactors: DEFAULT_MOWING_FACTORS,
+  mowingDollars: DEFAULT_MOWING_DOLLARS,
+  mulchingRates: DEFAULT_MULCHING_RATES,
+  pruningRates: DEFAULT_PRUNING_RATES,
+  turfAppRates: DEFAULT_TURF_APP_RATES,
+  leavesRates: DEFAULT_LEAVES_RATES,
+};
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+
+const deepMerge = (base, override) => {
+  if (Array.isArray(base)) return Array.isArray(override) ? clone(override) : clone(base);
+  if (!base || typeof base !== "object") return override === undefined ? base : override;
+
+  const result = { ...clone(base) };
+  if (!override || typeof override !== "object" || Array.isArray(override)) return result;
+
+  Object.entries(override).forEach(([key, value]) => {
+    result[key] = deepMerge(base[key], value);
+  });
+
+  return result;
+};
+
+export const mergeDefaultRates = (rates = {}) => deepMerge(APP_DEFAULT_RATES, rates);
+
+export const getStoredDefaultRates = () => {
+  if (typeof window === "undefined") return mergeDefaultRates();
+
+  try {
+    const stored = JSON.parse(localStorage.getItem(DEFAULT_RATES_STORAGE_KEY) || "null");
+    return mergeDefaultRates(stored || {});
+  } catch (err) {
+    console.error(err);
+    return mergeDefaultRates();
+  }
+};
+
+export const saveStoredDefaultRates = (rates) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DEFAULT_RATES_STORAGE_KEY, JSON.stringify(mergeDefaultRates(rates)));
+};
+
 
 export function ServiceProvider({ children }) {
 
@@ -97,14 +145,7 @@ export function ServiceProvider({ children }) {
   // ----------------------------------------
   // RATE STORAGE
   // ----------------------------------------
-  const [currentRates, setCurrentRates] = useState({
-    mowingFactors: DEFAULT_MOWING_FACTORS,
-    mowingDollars: DEFAULT_MOWING_DOLLARS,
-    mulchingRates: null,
-    pruningRates: null,   // ✅ ADDED (supports PruningRatesPage)
-    turfAppRates: DEFAULT_TURF_APP_RATES,
-    leavesRates: DEFAULT_LEAVES_RATES,
-  });
+  const [currentRates, setCurrentRates] = useState(() => getStoredDefaultRates());
 
   // ----------------------------------------
   // SERVICE UPDATE
@@ -147,14 +188,7 @@ export function ServiceProvider({ children }) {
   }, []);
 
   const resetRates = useCallback(() => {
-    setCurrentRates({
-      mowingFactors: DEFAULT_MOWING_FACTORS,
-      mowingDollars: DEFAULT_MOWING_DOLLARS,
-      mulchingRates: null,
-      pruningRates: null,
-      turfAppRates: DEFAULT_TURF_APP_RATES,
-      leavesRates: DEFAULT_LEAVES_RATES,
-    });
+    setCurrentRates(getStoredDefaultRates());
   }, []);
 
   const value = useMemo(

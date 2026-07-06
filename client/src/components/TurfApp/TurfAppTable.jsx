@@ -50,7 +50,14 @@ export default function TurfAppTable({ tableId, index, onDelete }) {
 
   const save = (updatedData) => {
     const updatedTotals = computeTurfAppTotals(updatedData, rates);
-    const updated = { ...updatedData, totals: updatedTotals };
+    const updated = {
+      ...updatedData,
+      qtyUnit: {
+        ...(updatedData.qtyUnit || {}),
+        ...updatedTotals.qtyUnit,
+      },
+      totals: updatedTotals,
+    };
 
     const nextList = turfList.some((t) => t.id === tableId)
       ? turfList.map((t) => (t.id === tableId ? { id: tableId, data: updated } : t))

@@ -32,6 +32,7 @@ The major application parts are:
 
 - Main project setup page: client/src/components/ProjectForm.jsx
 - Services summary page: client/src/components/ServicesPage.jsx
+- Default rates editor: client/src/components/DefaultRatesPage.jsx
 - Shared state: client/src/context/ServiceContext.jsx
 - Routing: client/src/App.js
 - Backend server: server/server.js
@@ -49,6 +50,7 @@ The app is mounted with React Router using basename /shearon. That means the vis
 - /shearon/services/turf-app
 - /shearon/services/flowers
 - /shearon/services/extras
+- /shearon/default-rates
 
 Internally, the route paths are written without /shearon because BrowserRouter applies the basename.
 
@@ -61,10 +63,11 @@ The app uses client-side state while the user is editing. The server is only upd
 
 Routes are defined in client/src/App.js.
 
-Project and summary routes:
+Project, summary, and default routes:
 
 - / -> ProjectForm
 - /services -> ServicesPage
+- /default-rates -> DefaultRatesPage
 
 Service entry routes:
 
@@ -77,13 +80,20 @@ Service entry routes:
 - /services/flowers -> FlowersForm
 - /services/extras -> ExtrasForm
 
-Rate edit routes:
+Project rate edit routes:
 
 - /mowing-rates -> MowingRatesPage
 - /mulching-rates -> MulchingRatesPage
 - /pruning-rates -> PruningRatesPage
 - /turf-app-rates -> TurfAppRatesPage
 - /leaves-rates -> LeavesRatesPage
+
+Future-project default-rate route:
+
+- /default-rates -> DefaultRatesPage
+
+Important distinction:
+The individual rate edit routes above change currentRates for the active browser session and therefore for the project being edited. The /default-rates route edits the stored default rate set used when future new projects are started.
 
 The App component also contains two global behaviors:
 
@@ -155,9 +165,25 @@ currentRates default structure:
 - turfAppRates
 - leavesRates
 
-Rates are kept in the browser state. When a project is saved, the Services page also saves the currentRates object into the services payload under the special key __rates. When a saved project is loaded, ProjectForm reads that __rates object and restores each rate group into the shared rate state.
+Rates are kept in browser state while a project is being edited. When a project is saved, the Services page also saves the currentRates object into the services payload under the special key __rates. When a saved project is loaded, ProjectForm reads that __rates object and restores each rate group into the shared rate state.
 
-This means a saved project can carry the rate assumptions that were used at the time it was saved.
+This means a saved project carries the rate assumptions that were used at the time it was saved.
+
+Default rates for future projects:
+
+ServiceContext also defines the built-in application defaults in APP_DEFAULT_RATES and stores user-edited future-project defaults in localStorage under:
+
+shearonDefaultRates
+
+On startup, currentRates is initialized from getStoredDefaultRates(). resetRates() also reloads getStoredDefaultRates(). Therefore, when a user starts a brand-new project, the app uses the latest saved default-rate preferences. Loading an existing saved project still restores that project's own services.__rates object and does not adopt newer future-project defaults.
+
+Default-rate helper functions:
+
+- mergeDefaultRates(rates): deep-merges a partial stored rate object with APP_DEFAULT_RATES so newly added rate fields get safe defaults.
+- getStoredDefaultRates(): reads shearonDefaultRates from localStorage and falls back to APP_DEFAULT_RATES if nothing is saved or parsing fails.
+- saveStoredDefaultRates(rates): writes the merged default-rate object back to localStorage.
+
+This default-rate system is client-side. It is not stored in SQLite and is separate from the per-project __rates snapshot.
 
 
 ================================================================================
@@ -183,7 +209,8 @@ Project object shape in the browser:
   id: null or number,
   projectName: string,
   date: string,
-  acres: string or number
+  acres: string or number,
+  lastModified: string
 }
 
 Main page workflow:
@@ -193,7 +220,7 @@ Main page workflow:
 3. The user can enter Project Name, Date, and Turf Acres.
 4. Clicking Create runs handleContinue.
 5. handleContinue requires all three fields.
-6. If this is a new project with no id, service state and rates are reset.
+6. If this is a new project with no id, service state is reset and rates are reset to getStoredDefaultRates().
 7. The project is stored in localStorage under key project.
 8. The app navigates to /services.
 
@@ -254,7 +281,9 @@ It includes:
 
 Saved rates:
 
-If the project has a services.__rates object, those rates are used in the main-page total calculation. If a saved rate section is missing, the app falls back to defaults.
+If the project has a services.__rates object, those rates are used in the main-page total calculation. If a saved rate section is missing, the app falls back to built-in/default merged values.
+
+The main page also has a quiet, low-profile Edit default rates button at the bottom of the Project Setup panel. This navigates to /default-rates. It is intentionally separate from loading or editing a project; it changes the default rates that future new projects receive when resetRates() runs.
 
 
 ================================================================================
@@ -271,6 +300,7 @@ Project metadata displayed:
 - Project name, editable with Edit Name / Save New Name
 - Date
 - Turf Acres, editable directly on this page
+- Last Modified
 - Estimated Total
 
 When Turf Acres changes on this page, handleProjectFieldChange updates both local React state and localStorage project.
@@ -342,6 +372,8 @@ Validation:
 
 The services payload is built from getAllServices(). Each service key is copied into a sanitized object. currentRates is added under __rates.
 
+Before the request is sent, the client assigns project.lastModified to the current ISO timestamp. The server stores this as projects.last_modified and returns lastModified in the response. The client then updates local React state and localStorage with the saved timestamp.
+
 If the project has an id:
 
 - PUT /project/:id is used
@@ -373,6 +405,7 @@ The PDF includes:
 - Property name
 - Acres value
 - Date
+- Last modified date
 - Service rows
 - Occurrences
 - Price / Occ
@@ -393,6 +426,29 @@ The PDF generation logic creates PDF syntax manually:
 
 Important implementation note:
 The app's PDF generator is intentionally simple. It is designed for summary tables, not high-end PDF design. It avoids a dependency but does not support complex styling like HTML-to-PDF libraries.
+
+Plan Hours CSV download:
+
+The Services page can also download a plan-hours CSV as:
+
+[property-name]-plan-hours.csv
+
+The CSV starts with project metadata, then groups rows by service page. It includes columns:
+
+- Page
+- Service
+- Item
+- Qty / Occ
+- Unit
+- Occ
+- Total Qty
+- $/Occ
+- Total $
+- Notes
+
+For each service it writes detailed quantity lines where available and then a SERVICE TOTAL line. Mowing, mulching, pruning, leaves, spring cleanup, turf app, flowers, extras, edging, and bed maintenance can all contribute rows.
+
+For mowing, the Plan Hours export recomputes hours with the same current mowingFactors.acresPerHour, mowingFactors.smPwrEfficiency, and mowingFactors.smPwrAllocation used by the Mowing table and service summary. This keeps exported TRIMMER and BLOWER hours consistent with custom small-power defaults or project-specific small-power rates.
 
 
 ================================================================================
@@ -629,7 +685,19 @@ final = adjustedOcc * numOccurrences
 
 totalHoursAllOcc = totalHours * numOccurrences
 
-pricePerAcre = final / totalAcres, if totalAcres is greater than zero
+tableAcres is determined as:
+
+enteredTableAcres = Number(data.tableAcres || 0)
+legacyTotalAcres = Number(data.totalAcres || 0)
+tableAcres = enteredTableAcres if greater than 0,
+             otherwise legacyTotalAcres if greater than 0,
+             otherwise totalAcres
+
+remainingAcres = tableAcres - totalAcres
+
+pricePerAcre = adjustedOcc / tableAcres, if tableAcres is greater than zero
+
+This fallback protects older saved mowing projects. Some older saved mowing tables did not have tableAcres. When those projects are loaded, INITIAL_MOWING_DATA supplies tableAcres as 0. The calculation now falls back to saved legacy totalAcres when present, or to the sum of deck acres, so older projects do not show negative remaining acres or divide-by-zero price-per-acre output merely because the new tableAcres field was absent.
 
 Example:
 
@@ -1736,9 +1804,17 @@ totalDollars = 532 * 2 = 1,064
 16. RATE PAGES AND RATE LOGIC
 ================================================================================
 
-Rate pages allow default calculation assumptions to be edited in browser state.
+Rate pages allow calculation assumptions to be edited in browser state.
 
-Known rate pages:
+There are two related but different rate-editing concepts:
+
+1. Active project/session rates
+   These are edited from the existing service-specific rate pages. They update currentRates in ServiceContext and are saved with a project under services.__rates when Save Project is clicked.
+
+2. Future-project default rates
+   These are edited from /default-rates. They are saved in browser localStorage under shearonDefaultRates and are applied only when a new project starts or resetRates() runs. They do not rewrite existing saved projects and they do not mutate a loaded project's saved __rates.
+
+Known project/session rate pages:
 
 - Mowing Rates
 - Mulching Rates
@@ -1748,7 +1824,31 @@ Known rate pages:
 
 Rates are not saved to the server immediately when edited. Instead, rate edits update currentRates in ServiceContext. When the project is saved, currentRates is saved with the project under services.__rates.
 
-This design means rate edits are project-specific after save/load. A loaded project can restore the rate assumptions that were active when the project was saved.
+This design means project/session rate edits are project-specific after save/load. A loaded project can restore the rate assumptions that were active when the project was saved.
+
+DefaultRatesPage:
+
+Component: client/src/components/DefaultRatesPage.jsx
+Route: /default-rates, visible publicly as /shearon/default-rates
+
+The page is reached from the quiet Edit default rates button at the bottom of the main Project Setup panel. It organizes future-project defaults into service tabs:
+
+- Mowing
+- Mulching
+- Pruning
+- Fall Cleanup
+- Turf Application
+
+The editor renders three kinds of structures:
+
+- Simple object tables, such as pruningRates or mowingDollars.
+- Matrix object tables, such as mowingFactors.acresPerHour, leavesRates.propertyTypes, turfAppRates.areaTypes, and turfAppRates.equipmentMultiples.
+- Array tables for turfAppRates.fertilizerOptions.
+
+Save Defaults calls saveStoredDefaultRates(rates), then navigates back to the main page. Cancel Changes reloads getStoredDefaultRates() into the editor state. Reset All Defaults restores APP_DEFAULT_RATES into the editor state after confirmation; those reset values become persistent only after Save Defaults is clicked.
+
+Important behavior:
+Editing /default-rates does not call updateRates directly and does not immediately change the currently loaded project. It changes the default source that future new projects use.
 
 Mowing rates control:
 
@@ -1819,6 +1919,7 @@ projects:
 - project_name TEXT
 - date TEXT
 - acres REAL
+- last_modified TEXT
 
 services:
 
@@ -1853,11 +1954,11 @@ Deletes service rows for that project, then deletes the project row.
 
 PUT /project/:id
 
-Updates an existing project and replaces all service rows with the submitted current service data. This is a full replace, not a partial patch.
+Updates an existing project, writes last_modified, and replaces all service rows with the submitted current service data. This is a full replace, not a partial patch.
 
 POST /project
 
-Creates a new project row and inserts service rows for every submitted service key.
+Creates a new project row and inserts service rows for every submitted service key. It stores last_modified from project.lastModified if supplied, otherwise it creates a new ISO timestamp on the server.
 
 GET /rates
 
@@ -1897,7 +1998,8 @@ When saving, the Services page sends:
     id,
     projectName,
     date,
-    acres
+    acres,
+    lastModified
   },
   services: {
     mowing,
@@ -2412,6 +2514,14 @@ http://localhost:3000/
 
 The React app itself is also configured with BrowserRouter basename='/shearon'. This is important because React Router expects the public app base path to be /shearon.
 
+The new default-rate editor is just another React route under this basename. Its public URL is:
+
+https://robby.hopto.org/shearon/default-rates
+
+Internally, React Router sees that as:
+
+/default-rates
+
 How /shearon works with React Router:
 
 The browser sees:
@@ -2487,6 +2597,8 @@ On startup, Express creates tables if they do not already exist:
 - rates
 - mowing_rates
 
+The projects table includes last_modified. server/server.js creates the column in CREATE TABLE and also checks PRAGMA table_info(projects). If an older database is missing last_modified, the server runs ALTER TABLE projects ADD COLUMN last_modified TEXT on startup.
+
 This means the app can start with an empty SQLite file and create the required schema automatically.
 
 Express project API behavior:
@@ -2510,7 +2622,9 @@ GET /project/:id
 POST /project
 
 - Receives a new project and services payload.
-- Inserts project_name, date, and acres into projects.
+- Reads projectName, date, acres, and optional lastModified.
+- If lastModified is missing, creates a server-side ISO timestamp.
+- Inserts project_name, date, acres, and last_modified into projects.
 - Uses the new project id to insert each service key into services.
 - Each service object is stored as JSON text.
 - Returns { success: true, projectId }.
@@ -2518,7 +2632,9 @@ POST /project
 PUT /project/:id
 
 - Receives an existing project and services payload.
-- Updates the project row.
+- Reads projectName, date, acres, and optional lastModified.
+- If lastModified is missing, creates a server-side ISO timestamp.
+- Updates the project row, including last_modified.
 - Deletes all previous service rows for that project.
 - Inserts all submitted current service rows fresh.
 - Returns { success: true, projectId }.
@@ -2570,7 +2686,7 @@ How a Save Project request flows through the server:
 6. express.json() parses the JSON body.
 7. Express writes project data to SQLite.
 8. Express writes each service as JSON text in the services table.
-9. Express returns success JSON.
+9. Express returns success JSON with projectId and lastModified.
 10. React updates localStorage and navigates back to the main page.
 
 Common deployment checks:

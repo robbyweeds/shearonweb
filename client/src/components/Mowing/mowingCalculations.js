@@ -117,6 +117,10 @@ export function computeTotals(data, qtyUnit, mowingDollars = {}) {
     (sum, key) => sum + Number(data.acres?.[key] || 0),
     0
   );
+  const enteredTableAcres = Number(data.tableAcres || 0);
+  const legacyTotalAcres = Number(data.totalAcres || 0);
+  const tableAcres = enteredTableAcres > 0 ? enteredTableAcres : legacyTotalAcres > 0 ? legacyTotalAcres : totalAcres;
+  const remainingAcres = tableAcres - totalAcres;
 
   const adjPercent = Number(data.summary?.adjPercent || 0);
   const numOccurrences = Number(data.summary?.numOccurrences || 0);
@@ -125,11 +129,13 @@ export function computeTotals(data, qtyUnit, mowingDollars = {}) {
   const adjustedOcc = totalOcc + adjDollar;
   const final = adjustedOcc * numOccurrences;
   const totalHoursAllOcc = totalHours * numOccurrences;
-  const pricePerAcre = totalAcres > 0 ? final / totalAcres : 0;
+  const pricePerAcre = tableAcres > 0 ? adjustedOcc / tableAcres : 0;
 
   return {
     totalHours,
     totalAcres,
+    tableAcres,
+    remainingAcres,
     totalOcc,
     adjDollar,
     adjustedOcc,

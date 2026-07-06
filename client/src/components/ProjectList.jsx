@@ -17,7 +17,7 @@ export default function ProjectList() {
   }, []);
 
   const handleDelete = (projectId) => {
-  if (!window.confirm("Are you sure you want to delete this project?")) return;
+  if (!window.confirm("Delete this project?")) return;
 
   fetch(`/api/project/${projectId}`, { method: "DELETE" })
     .then(res => res.json())
@@ -48,6 +48,7 @@ export default function ProjectList() {
             projectName: data.project.project_name,
             date: data.project.date,
             acres: data.project.acres,
+            lastModified: data.project.last_modified || data.project.lastModified || data.project.date,
           }));
 
           navigate("/services");

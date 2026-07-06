@@ -18,7 +18,7 @@ import { SPRING_CLEANUP_TABLES } from "./SpringCleanup/springCleanupDefaults";
 
 const API_URL = process.env.REACT_APP_API_URL || "";
 const SAVED_RATES_KEY = "__rates";
-const EMPTY_PROJECT = { id: null, projectName: "", date: "", acres: "" };
+const EMPTY_PROJECT = { id: null, projectName: "", date: "", acres: "", lastModified: "" };
 
 const formatShortDate = (value) => {
   if (!value) return "No date";
@@ -78,7 +78,12 @@ const getProjectContractTotal = (project) => {
       },
       summary: { ...INITIAL_MOWING_DATA.summary, ...(raw.summary || {}) },
     };
-    const qty = computeHours(merged, rates.mowingFactors?.acresPerHour || {});
+    const qty = computeHours(
+      merged,
+      rates.mowingFactors?.acresPerHour || {},
+      rates.mowingFactors?.smPwrEfficiency || {},
+      rates.mowingFactors?.smPwrAllocation || {}
+    );
     total += computeTotals(merged, qty, rates.mowingDollars || {}).final || 0;
   });
 
@@ -196,6 +201,7 @@ export default function ProjectForm() {
             projectName: data.project.project_name,
             date: data.project.date,
             acres: data.project.acres,
+            lastModified: data.project.last_modified || data.project.lastModified || data.project.date,
           };
 
           resetServices();
@@ -222,7 +228,7 @@ export default function ProjectForm() {
   };
 
   const handleDelete = (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project?")) return;
+    if (!window.confirm("Delete this project?")) return;
 
     fetch(`${API_URL}/project/${projectId}`, { method: "DELETE" })
       .then((res) => res.json())
@@ -357,6 +363,12 @@ export default function ProjectForm() {
             <button type="submit">Create</button>
           </div>
         </form>
+
+        <div className="main-page-utility-actions">
+          <button className="quiet-link-button" onClick={() => navigate("/default-rates")} type="button">
+            Edit default rates
+          </button>
+        </div>
       </section>
     </main>
   );

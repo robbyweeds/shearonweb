@@ -36,9 +36,15 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_name TEXT,
     date TEXT,
-    acres REAL
+    acres REAL,
+    last_modified TEXT
   );
 `);
+
+const projectColumns = db.prepare("PRAGMA table_info(projects)").all();
+if (!projectColumns.some((column) => column.name === "last_modified")) {
+  db.prepare("ALTER TABLE projects ADD COLUMN last_modified TEXT").run();
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS services (
@@ -185,9 +191,10 @@ app.put("/project/:id", (req, res) => {
     const projectId = req.params.id;
     const { project, services } = req.body;
     const { projectName, date, acres } = project;
+    const lastModified = project.lastModified || new Date().toISOString();
 
     const updateProject = db.prepare(
-      "UPDATE projects SET project_name = ?, date = ?, acres = ? WHERE id = ?"
+      "UPDATE projects SET project_name = ?, date = ?, acres = ?, last_modified = ? WHERE id = ?"
     );
     const deleteServices = db.prepare("DELETE FROM services WHERE project_id = ?");
     const insertService = db.prepare(
@@ -195,7 +202,7 @@ app.put("/project/:id", (req, res) => {
     );
 
     const saveExistingProject = db.transaction(() => {
-      const result = updateProject.run(projectName, date, acres, projectId);
+      const result = updateProject.run(projectName, date, acres, lastModified, projectId);
 
       if (result.changes === 0) {
         throw new Error("Project not found");
@@ -210,7 +217,7 @@ app.put("/project/:id", (req, res) => {
 
     saveExistingProject();
 
-    res.json({ success: true, projectId: Number(projectId) });
+    res.json({ success: true, projectId: Number(projectId), lastModified });
   } catch (err) {
     const status = err.message === "Project not found" ? 404 : 500;
     res.status(status).json({ success: false, error: err.message });
@@ -224,13 +231,14 @@ app.post("/project", (req, res) => {
   try {
     const { project, services } = req.body;
     const { projectName, date, acres } = project;
+    const lastModified = project.lastModified || new Date().toISOString();
 
     // Insert project
     const info = db
       .prepare(
-        "INSERT INTO projects (project_name, date, acres) VALUES (?, ?, ?)"
+        "INSERT INTO projects (project_name, date, acres, last_modified) VALUES (?, ?, ?, ?)"
       )
-      .run(projectName, date, acres);
+      .run(projectName, date, acres, lastModified);
 
     const projectId = info.lastInsertRowid;
 
@@ -248,7 +256,7 @@ app.post("/project", (req, res) => {
 
     insertMany(services);
 
-    res.json({ success: true, projectId });
+    res.json({ success: true, projectId, lastModified });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }

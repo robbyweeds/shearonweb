@@ -13,7 +13,8 @@ db.serialize(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_name TEXT NOT NULL,
       date TEXT NOT NULL,
-      acres REAL NOT NULL
+      acres REAL NOT NULL,
+      last_modified TEXT
     )
   `);
 

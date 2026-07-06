@@ -62,6 +62,7 @@ export const DISPLAY_KEYS = [
 export const INITIAL_MOWING_DATA = {
   name: "Mowing Area",
 
+  tableAcres: 0,
   crewSize: 0,
   days: 0,
   notes: "",

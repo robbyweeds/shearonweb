@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from "react-route
 // Pages
 import ProjectForm from "./components/ProjectForm";
 import ServicesPage from "./components/ServicesPage";
+import DefaultRatesPage from "./components/DefaultRatesPage";
 
 import MowingForm from "./components/MowingForm";
 import MulchingForm from "./components/MulchingForm";
@@ -51,6 +52,7 @@ function App() {
         <Routes>
         <Route path="/" element={<ProjectForm />} />
         <Route path="/services" element={<ServicesPage />} />
+        <Route path="/default-rates" element={<DefaultRatesPage />} />
 
         {/* SERVICE FORMS */}
         <Route path="/services/mowing" element={<MowingForm />} />

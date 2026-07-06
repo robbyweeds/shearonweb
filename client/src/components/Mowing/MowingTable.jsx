@@ -80,10 +80,18 @@ export default function MowingTable({ tableId, onDelete }) {
 
   const pricePerAcre =
     totals.pricePerAcre ??
-    (totals.totalAcres > 0 ? (totals.final || 0) / totals.totalAcres : 0);
+    (totals.tableAcres > 0 ? adjustedOcc / totals.tableAcres : 0);
 
   const save = (updated) => {
-    saveMowing(tableId, updated, mowingList, updateService, totals);
+    const updatedQty = computeHours(
+      updated,
+      acresPerHour,
+      smPwrEfficiency,
+      smPwrAllocation
+    );
+    const updatedTotals = computeTotals(updated, updatedQty, mowingDollars);
+
+    saveMowing(tableId, updated, mowingList, updateService, updatedTotals);
   };
 
   const handleNameChange = (e) => save({ ...data, name: e.target.value });
@@ -183,6 +191,23 @@ export default function MowingTable({ tableId, onDelete }) {
     fontWeight: "bold",
   };
 
+  const notesCellStyle = {
+    padding: "2px 4px",
+    verticalAlign: "top",
+    textAlign: "left",
+    background: "#fff",
+  };
+
+  const notesTextareaStyle = {
+    width: "100%",
+    height: "42px",
+    padding: "3px 4px",
+    resize: "none",
+    boxSizing: "border-box",
+    fontSize: "11px",
+    lineHeight: "14px",
+  };
+
   return (
     <div
       style={{
@@ -195,7 +220,7 @@ export default function MowingTable({ tableId, onDelete }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "2fr 100px",
+          gridTemplateColumns: "2fr 120px 100px",
           gap: "15px",
           alignItems: "end",
           marginBottom: "12px",
@@ -219,6 +244,18 @@ export default function MowingTable({ tableId, onDelete }) {
         </div>
 
         <div>
+          <label style={{ fontWeight: "bold" }}>Acres</label>
+          <input
+            type="number"
+            min="0"
+            step="0.25"
+            value={data.tableAcres}
+            onChange={handleFieldChange("tableAcres")}
+            style={{ width: "100%", padding: "6px", background: "yellow" }}
+          />
+        </div>
+
+        <div>
           <label style={{ fontWeight: "bold" }}>Crew Size</label>
           <input
             type="number"
@@ -227,16 +264,6 @@ export default function MowingTable({ tableId, onDelete }) {
             style={{ width: "100%", padding: "6px" }}
           />
         </div>
-      </div>
-
-      <div style={{ marginBottom: "12px" }}>
-        <label style={{ fontWeight: "bold" }}>Notes</label>
-        <textarea
-          rows={2}
-          value={data.notes}
-          onChange={handleFieldChange("notes")}
-          style={{ width: "100%", padding: "8px", resize: "vertical" }}
-        />
       </div>
 
       <table
@@ -309,7 +336,7 @@ export default function MowingTable({ tableId, onDelete }) {
             <td style={{ ...cellStyle, background: "#ccc" }}></td>
             <td style={{ ...cellStyle, background: "#ccc" }}></td>
             <td style={summaryLabelStyle}>ACRES:</td>
-            <td style={summaryValueStyle}>{totals.totalAcres.toFixed(2)}</td>
+            <td style={summaryValueStyle}>{totals.remainingAcres.toFixed(2)}</td>
           </tr>
 
           <tr>
@@ -455,22 +482,30 @@ export default function MowingTable({ tableId, onDelete }) {
           </tr>
 
           <tr>
-            <td colSpan={12} style={{ border: "none" }}></td>
+            <td rowSpan={3} colSpan={12} style={notesCellStyle}>
+              <label style={{ display: "block", fontWeight: "bold", marginBottom: "1px", fontSize: "11px" }}>
+                Notes
+              </label>
+              <textarea
+                rows={2}
+                value={data.notes}
+                onChange={handleFieldChange("notes")}
+                style={notesTextareaStyle}
+              />
+            </td>
             <td style={summaryLabelStyle}>TOTAL $:</td>
             <td style={summaryValueStyle}>{formatCurrency(totals.final)}</td>
           </tr>
 
           <tr>
-            <td colSpan={12} style={{ border: "none" }}></td>
             <td style={summaryLabelStyle}>TOT HRS:</td>
             <td style={summaryValueStyle}>{totalHoursAllOcc.toFixed(2)}</td>
           </tr>
 
           <tr>
-            <td colSpan={12} style={{ border: "none" }}></td>
             <td style={summaryLabelStyle}>Price / A:</td>
             <td style={summaryValueStyle}>
-              {totals.totalAcres > 0 ? formatCurrency(pricePerAcre) : "#DIV/0!"}
+              {totals.tableAcres > 0 ? formatCurrency(pricePerAcre) : "#DIV/0!"}
             </td>
           </tr>
         </tbody>
